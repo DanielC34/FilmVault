@@ -37,6 +37,12 @@ export interface WatchlistItem {
   added_at: string;
 }
 
+export interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
 export interface AppState {
   user: Profile | null;
   watchlists: Watchlist[];
@@ -45,4 +51,9 @@ export interface AppState {
   searchQuery: string;
   searchResults: Movie[];
   trendingMovies: Movie[];
+  toast: Toast | null;
+  trendingPage: number;
+  totalTrendingPages: number;
+  searchPage: number;
+  totalSearchPages: number;
 }

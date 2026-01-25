@@ -6,6 +6,9 @@ import MovieCard from './components/MovieCard';
 import MovieDetailModal from './components/MovieDetailModal';
 import AddToWatchlistSheet from './components/AddToWatchlistSheet';
 import CreateWatchlistModal from './components/CreateWatchlistModal';
+import ToastNotification from './components/ToastNotification';
+import Pagination from './components/Pagination';
+import { MovieCardSkeleton, VaultCardSkeleton } from './components/Skeletons';
 import { Movie, Watchlist, WatchlistItem } from './types';
 import { ICONS, THEME, TMDB_IMAGE_BASE, BACKDROP_SIZE, POSTER_SIZE } from './constants';
 import { geminiService } from './services/geminiService';
@@ -17,18 +20,23 @@ const App: React.FC = () => {
     searchResults, 
     searchQuery, 
     setSearchQuery, 
-    loadMoreSearch,
-    loadMoreTrending,
+    setTrendingPage,
+    setSearchPage,
+    trendingPage,
+    totalTrendingPages,
+    searchPage,
+    totalSearchPages,
     watchlists, 
     activeWatchlistItems,
     isLoading,
-    isMoreLoading,
     addToWatchlist,
     createWatchlist,
     fetchWatchlistItems,
     removeFromWatchlist,
     deleteWatchlist,
-    user
+    user,
+    toast,
+    hideToast
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<'home' | 'search' | 'lists' | 'profile'>('home');
@@ -65,8 +73,6 @@ const App: React.FC = () => {
     const newList = await createWatchlist(title, description);
     setIsCreatingVault(false);
     
-    // Feature request: if we were in the middle of adding a movie to a watchlist,
-    // automatically add it to this new one we just created.
     if (newList && showAddSheet) {
       await addToWatchlist(newList.id, showAddSheet);
       setShowAddSheet(null);
@@ -92,19 +98,14 @@ const App: React.FC = () => {
     return true;
   });
 
-  if (isLoading && activeTab !== 'lists' && trendingMovies.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#14181c]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-[#00e054] border-t-transparent rounded-full animate-spin" />
-          <h2 className="text-[#00e054] font-black uppercase tracking-[0.3em]">FilmVault</h2>
-        </div>
-      </div>
-    );
-  }
+  // Root loading removed to allow Layout and skeletons to show
+  const isInitialLoading = isLoading && trendingMovies.length === 0 && activeTab === 'home';
 
   return (
     <Layout activeTab={activeTab} onTabChange={(tab) => { setActiveTab(tab); setViewingWatchlist(null); }}>
+      {/* Toast Notification */}
+      {toast && <ToastNotification toast={toast} onClose={hideToast} />}
+
       {/* Home / Feed View */}
       {activeTab === 'home' && (
         <div className="space-y-8 animate-in fade-in duration-700 pb-32">
@@ -112,28 +113,34 @@ const App: React.FC = () => {
           <div className="px-4 py-2">
             <h2 className="text-white/40 text-[10px] font-black uppercase tracking-[0.4em] mb-4">Trending Now</h2>
             <div className="flex overflow-x-auto gap-4 pb-4 no-scrollbar -mx-4 px-4">
-              {trendingMovies.slice(0, 5).map(movie => (
-                <div key={movie.id} className="w-[85vw] flex-shrink-0 group">
-                  <button 
-                    onClick={() => setSelectedMovie(movie)}
-                    className="w-full h-48 rounded-2xl overflow-hidden relative shadow-2xl border border-white/10 text-left"
-                  >
-                    <img 
-                      src={movie.backdrop_path ? `${TMDB_IMAGE_BASE}${BACKDROP_SIZE}${movie.backdrop_path}` : `${TMDB_IMAGE_BASE}${BACKDROP_SIZE}${movie.poster_path}`}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                      alt={movie.title}
-                      onError={(e: any) => { e.target.src = 'https://via.placeholder.com/800x400?text=FilmVault'; }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <h3 className="text-xl font-black text-white leading-tight">{movie.title}</h3>
-                      <p className="text-white/60 text-xs font-bold mt-1 uppercase tracking-widest">
-                        {movie.release_date ? new Date(movie.release_date).getFullYear() : 'TBA'} • {movie.media_type.toUpperCase()}
-                      </p>
-                    </div>
-                  </button>
-                </div>
-              ))}
+              {isInitialLoading ? (
+                [...Array(3)].map((_, i) => (
+                  <div key={i} className="w-[85vw] h-48 rounded-2xl bg-[#1a2128] animate-pulse flex-shrink-0" />
+                ))
+              ) : (
+                trendingMovies.slice(0, 10).map(movie => (
+                  <div key={movie.id} className="w-[85vw] flex-shrink-0 group">
+                    <button 
+                      onClick={() => setSelectedMovie(movie)}
+                      className="w-full h-48 rounded-2xl overflow-hidden relative shadow-2xl border border-white/10 text-left"
+                    >
+                      <img 
+                        src={movie.backdrop_path ? `${TMDB_IMAGE_BASE}${BACKDROP_SIZE}${movie.backdrop_path}` : `${TMDB_IMAGE_BASE}${BACKDROP_SIZE}${movie.poster_path}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                        alt={movie.title}
+                        onError={(e: any) => { e.target.src = 'https://via.placeholder.com/800x400?text=FilmVault'; }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                      <div className="absolute bottom-4 left-4 right-4">
+                        <h3 className="text-xl font-black text-white leading-tight">{movie.title}</h3>
+                        <p className="text-white/60 text-xs font-bold mt-1 uppercase tracking-widest">
+                          {movie.release_date ? new Date(movie.release_date).getFullYear() : 'TBA'} • {movie.media_type.toUpperCase()}
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -156,28 +163,24 @@ const App: React.FC = () => {
 
           {/* Grid Section */}
           <div className="px-4">
-            <h2 className="text-white/40 text-[10px] font-black uppercase tracking-[0.4em] mb-6">Discovery</h2>
+            <h2 className="text-white/40 text-[10px] font-black uppercase tracking-[0.4em] mb-6 text-left">Discovery Archive</h2>
+            
             <div className="grid grid-cols-3 gap-4">
-              {filteredMovies.map(movie => (
-                <MovieCard key={`${movie.id}-${movie.media_type}`} movie={movie} onClick={setSelectedMovie} />
-              ))}
+              {isLoading ? (
+                [...Array(12)].map((_, i) => <MovieCardSkeleton key={i} />)
+              ) : (
+                filteredMovies.map(movie => (
+                  <MovieCard key={`${movie.id}-${movie.media_type}`} movie={movie} onClick={setSelectedMovie} />
+                ))
+              )}
             </div>
 
-            {/* Load More Button */}
-            <div className="mt-12 mb-8 flex justify-center">
-              <button 
-                onClick={loadMoreTrending}
-                disabled={isMoreLoading}
-                className="px-10 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-black text-xs uppercase tracking-[0.3em] hover:bg-white/10 transition-all flex items-center gap-3 active:scale-95 disabled:opacity-50"
-              >
-                {isMoreLoading ? (
-                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                ) : (
-                  ICONS.Plus
-                )}
-                {isMoreLoading ? 'Consulting Archive...' : 'Load More Results'}
-              </button>
-            </div>
+            <Pagination 
+              currentPage={trendingPage} 
+              totalPages={totalTrendingPages} 
+              onPageChange={setTrendingPage} 
+              isLoading={isLoading}
+            />
           </div>
         </div>
       )}
@@ -187,45 +190,51 @@ const App: React.FC = () => {
         <div className="px-6 space-y-8 animate-in slide-in-from-right duration-500 pb-32">
           {!viewingWatchlist ? (
             <>
-              <header className="py-4">
-                <h2 className="text-3xl font-black text-white mb-2 text-left">My Vaults</h2>
-                <div className="p-4 bg-[#1a2128] border border-white/5 rounded-2xl text-[11px] font-medium text-white/50 italic flex gap-3 items-start text-left">
+              <header className="py-4 text-left">
+                <h2 className="text-3xl font-black text-white mb-2">My Vaults</h2>
+                <div className="p-4 bg-[#1a2128] border border-white/5 rounded-2xl text-[11px] font-medium text-white/50 italic flex gap-3 items-start">
                    <div className="text-[#00e054] mt-0.5">{ICONS.Sparkles}</div>
                    <span>{vaultVibe || "Analyzing your cinematic taste..."}</span>
                 </div>
               </header>
 
               <div className="space-y-4">
-                {watchlists.map(list => (
-                  <button 
-                    key={list.id}
-                    onClick={() => openWatchlist(list)}
-                    className="w-full flex items-center justify-between p-6 rounded-[24px] bg-[#1a2128] border border-white/5 hover:border-white/20 hover:bg-[#2c343c]/30 transition-all group relative overflow-hidden shadow-xl"
-                  >
-                    <div className="flex items-center gap-5 relative z-10 text-left">
-                      <div className="w-14 h-14 bg-[#14181c] rounded-2xl flex items-center justify-center text-[#00e054] shadow-inner">
-                        {ICONS.List}
+                {isLoading && watchlists.length === 0 ? (
+                  [...Array(3)].map((_, i) => <VaultCardSkeleton key={i} />)
+                ) : (
+                  <>
+                    {watchlists.map(list => (
+                      <button 
+                        key={list.id}
+                        onClick={() => openWatchlist(list)}
+                        className="w-full flex items-center justify-between p-6 rounded-[24px] bg-[#1a2128] border border-white/5 hover:border-white/20 hover:bg-[#2c343c]/30 transition-all group relative overflow-hidden shadow-xl"
+                      >
+                        <div className="flex items-center gap-5 relative z-10 text-left">
+                          <div className="w-14 h-14 bg-[#14181c] rounded-2xl flex items-center justify-center text-[#00e054] shadow-inner">
+                            {ICONS.List}
+                          </div>
+                          <div className="text-left">
+                            <h4 className="text-lg font-black text-white group-hover:text-[#00e054] transition-colors">{list.title}</h4>
+                            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mt-1">{list.item_count || 0} ITEMS IN VAULT</p>
+                          </div>
+                        </div>
+                        <div className="text-white/10 group-hover:text-white/40 transition-colors relative z-10">
+                          {ICONS.ChevronRight}
+                        </div>
+                      </button>
+                    ))}
+                    
+                    <button 
+                      onClick={() => setIsCreatingVault(true)}
+                      className="w-full py-6 rounded-[24px] border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-2 text-white/30 hover:border-white/30 hover:text-white transition-all group"
+                    >
+                      <div className="p-2 border-2 border-dashed border-current rounded-xl group-hover:scale-110 transition-transform">
+                        {ICONS.Plus}
                       </div>
-                      <div className="text-left">
-                        <h4 className="text-lg font-black text-white group-hover:text-[#00e054] transition-colors">{list.title}</h4>
-                        <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mt-1">{list.item_count || 0} ITEMS IN VAULT</p>
-                      </div>
-                    </div>
-                    <div className="text-white/10 group-hover:text-white/40 transition-colors relative z-10">
-                      {ICONS.ChevronRight}
-                    </div>
-                  </button>
-                ))}
-                
-                <button 
-                  onClick={() => setIsCreatingVault(true)}
-                  className="w-full py-6 rounded-[24px] border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-2 text-white/30 hover:border-white/30 hover:text-white transition-all group"
-                >
-                  <div className="p-2 border-2 border-dashed border-current rounded-xl group-hover:scale-110 transition-transform">
-                    {ICONS.Plus}
-                  </div>
-                  <span className="text-xs font-black uppercase tracking-widest">Construct New Vault</span>
-                </button>
+                      <span className="text-xs font-black uppercase tracking-widest">Construct New Vault</span>
+                    </button>
+                  </>
+                )}
               </div>
             </>
           ) : (
@@ -239,8 +248,8 @@ const App: React.FC = () => {
                   Back to Vaults
                 </button>
                 
-                <div className="flex justify-between items-start">
-                  <div className="text-left">
+                <div className="flex justify-between items-start text-left">
+                  <div>
                     <h2 className="text-4xl font-black text-white leading-tight">{viewingWatchlist.title}</h2>
                     <p className="text-white/40 text-sm font-medium mt-2 max-w-md">{viewingWatchlist.description || "No description provided."}</p>
                   </div>
@@ -259,10 +268,12 @@ const App: React.FC = () => {
                 </div>
               </header>
 
-              {activeWatchlistItems.length > 0 ? (
-                <div className="grid grid-cols-3 gap-4 pb-32">
-                  {activeWatchlistItems.map((item: WatchlistItem) => (
-                    <div key={item.id} className="relative group">
+              <div className="grid grid-cols-3 gap-4 pb-32">
+                {isLoading ? (
+                  [...Array(6)].map((_, i) => <MovieCardSkeleton key={i} />)
+                ) : activeWatchlistItems.length > 0 ? (
+                  activeWatchlistItems.map((item: WatchlistItem) => (
+                    <div key={item.id} className="relative group focus-within:ring-2 focus-within:ring-[#00e054] focus-within:rounded-xl">
                       <button 
                         onClick={() => setSelectedMovie({
                           id: item.media_id,
@@ -291,29 +302,33 @@ const App: React.FC = () => {
                         </div>
                         <h4 className="mt-2 text-[10px] font-bold text-white/80 truncate group-hover:text-white">{item.title}</h4>
                       </button>
+                      
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
-                          removeFromWatchlist(item.id);
+                          if (window.confirm(`Remove "${item.title}" from this vault?`)) {
+                            removeFromWatchlist(item.id);
+                          }
                         }}
-                        className="absolute -top-2 -right-2 p-1.5 bg-black/80 text-white/40 hover:text-red-500 rounded-full border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute -top-1.5 -right-1.5 p-1.5 bg-[#14181c] text-red-500 rounded-full border border-red-500/20 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all shadow-xl z-20 hover:bg-red-500 hover:text-white"
+                        title="Remove from vault"
                       >
-                        <div className="scale-75 rotate-45">{ICONS.Plus}</div>
+                        <div className="scale-[0.85]">{ICONS.X}</div>
                       </button>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-24 flex flex-col items-center justify-center text-center space-y-4">
-                  <div className="p-6 bg-white/5 rounded-full text-white/10">
-                    <div className="scale-150">{ICONS.Film}</div>
+                  ))
+                ) : (
+                  <div className="col-span-3 py-24 flex flex-col items-center justify-center text-center space-y-4">
+                    <div className="p-6 bg-white/5 rounded-full text-white/10">
+                      <div className="scale-150">{ICONS.Film}</div>
+                    </div>
+                    <div>
+                      <h3 className="text-white/40 font-black uppercase tracking-[0.2em]">Vault is Empty</h3>
+                      <p className="text-white/20 text-xs font-medium mt-1">Start adding movies from the feed or search.</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-white/40 font-black uppercase tracking-[0.2em]">Vault is Empty</h3>
-                    <p className="text-white/20 text-xs font-medium mt-1">Start adding movies from the feed or search.</p>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -339,35 +354,35 @@ const App: React.FC = () => {
 
            {searchQuery.length > 0 ? (
              <div>
-               <div className="grid grid-cols-3 gap-4">
-                 {searchResults.map(movie => (
-                   <MovieCard key={`${movie.id}-${movie.media_type}`} movie={movie} onClick={setSelectedMovie} />
-                 ))}
-                 {searchResults.length === 0 && !isLoading && (
+               <div className="grid grid-cols-3 gap-4 text-left">
+                 {isLoading && searchResults.length === 0 ? (
+                   [...Array(9)].map((_, i) => <MovieCardSkeleton key={i} />)
+                 ) : (
+                   searchResults.map(movie => (
+                     <MovieCard key={`${movie.id}-${movie.media_type}`} movie={movie} onClick={setSelectedMovie} />
+                   ))
+                 )}
+                 {!isLoading && searchQuery.length > 0 && searchResults.length === 0 && (
                    <div className="col-span-3 text-center py-20">
                       <p className="text-white/20 font-black uppercase tracking-[0.2em]">No Matches Found</p>
                    </div>
                  )}
                </div>
-               {searchResults.length > 0 && (
-                 <div className="mt-12 flex justify-center">
-                    <button 
-                      onClick={loadMoreSearch}
-                      disabled={isMoreLoading}
-                      className="px-10 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-black text-xs uppercase tracking-[0.3em] hover:bg-white/10 transition-all active:scale-95 disabled:opacity-50"
-                    >
-                      {isMoreLoading ? 'Consulting Archive...' : 'Load More Results'}
-                    </button>
-                 </div>
-               )}
+               
+               <Pagination 
+                 currentPage={searchPage} 
+                 totalPages={totalSearchPages} 
+                 onPageChange={setSearchPage} 
+                 isLoading={isLoading}
+               />
              </div>
            ) : (
-             <div className="space-y-8">
+             <div className="space-y-8 text-left">
                 <section>
-                  <h3 className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mb-4 text-left">Popular Genres</h3>
+                  <h3 className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mb-4">Popular Genres</h3>
                   <div className="flex flex-wrap gap-2">
                     {['Noir', 'Sci-Fi', 'Horror', 'Cyberpunk', 'Giallo', 'New Wave'].map(genre => (
-                      <button key={genre} className="px-5 py-3 rounded-2xl bg-[#1a2128] border border-white/5 text-xs font-bold text-white/60 hover:text-white transition-colors text-left">
+                      <button key={genre} className="px-5 py-3 rounded-2xl bg-[#1a2128] border border-white/5 text-xs font-bold text-white/60 hover:text-white transition-colors">
                         {genre}
                       </button>
                     ))}
@@ -375,7 +390,7 @@ const App: React.FC = () => {
                 </section>
                 
                 <section>
-                  <h3 className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mb-4 text-left">Recent Discoveries</h3>
+                  <h3 className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mb-4">Trending Today</h3>
                    <div className="grid grid-cols-3 gap-4">
                     {trendingMovies.slice(0, 3).map(movie => (
                       <MovieCard key={`${movie.id}-discovery`} movie={movie} onClick={setSelectedMovie} />

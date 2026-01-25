@@ -28,6 +28,13 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #404b57;
         }
+        @keyframes toast-progress {
+            from { width: 100%; }
+            to { width: 0%; }
+        }
+        .animate-toast-progress {
+            animation: toast-progress 3s linear forwards;
+        }
     </style>
 <script type="importmap">
 {
