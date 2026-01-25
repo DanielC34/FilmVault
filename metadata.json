@@ -1,0 +1,7 @@
+{
+  "name": "Copy of FilmVault Premium",
+  "description": "A high-end movie and TV show tracking application inspired by Letterboxd, featuring AI-powered recommendations and deep watchlist management.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
