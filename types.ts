@@ -25,6 +25,7 @@ export interface Watchlist {
   description: string | null;
   created_at: string;
   item_count?: number;
+  is_system_list?: boolean;
 }
 
 export interface WatchlistItem {
@@ -47,6 +48,7 @@ export interface AppState {
   user: Profile | null;
   watchlists: Watchlist[];
   activeWatchlistItems: WatchlistItem[];
+  favoriteIds: Set<string>; // For quick lookup of favorited movies
   isLoading: boolean;
   searchQuery: string;
   searchResults: Movie[];

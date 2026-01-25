@@ -1,9 +1,5 @@
 
-
 import { Watchlist, WatchlistItem, Profile, MediaType } from '../types';
-
-// In a real app, this would use the @supabase/supabase-js client.
-// Here we simulate the logic for the SPA environment.
 
 const MOCK_USER: Profile = {
   id: 'user_123',
@@ -13,18 +9,19 @@ const MOCK_USER: Profile = {
 
 let mockWatchlists: Watchlist[] = [
   {
+    id: 'wl_fav',
+    user_id: 'user_123',
+    title: 'Favorites',
+    description: 'Your top-tier cinematic picks.',
+    created_at: new Date().toISOString(),
+    item_count: 0,
+    is_system_list: true
+  },
+  {
     id: 'wl_1',
     user_id: 'user_123',
     title: '2025 Must Watch',
     description: 'The definitive list for next year.',
-    created_at: new Date().toISOString(),
-    item_count: 3
-  },
-  {
-    id: 'wl_2',
-    user_id: 'user_123',
-    title: 'Horror Classics',
-    description: 'Spooky season essentials.',
     created_at: new Date().toISOString(),
     item_count: 1
   }
@@ -34,7 +31,6 @@ let mockItems: WatchlistItem[] = [
   {
     id: 'item_1',
     watchlist_id: 'wl_1',
-    // Fixed: Converting numeric value to string as per WatchlistItem interface
     media_id: '550',
     media_type: 'movie',
     title: 'Fight Club',
@@ -50,6 +46,12 @@ export const supabaseMock = {
     return [...mockWatchlists];
   },
 
+  getFavorites: async () => {
+    const favList = mockWatchlists.find(w => w.is_system_list);
+    if (!favList) return [];
+    return mockItems.filter(i => i.watchlist_id === favList.id);
+  },
+
   createWatchlist: async (title: string, description: string) => {
     const newList: Watchlist = {
       id: `wl_${Math.random().toString(36).substr(2, 9)}`,
@@ -57,13 +59,16 @@ export const supabaseMock = {
       title,
       description,
       created_at: new Date().toISOString(),
-      item_count: 0
+      item_count: 0,
+      is_system_list: false
     };
     mockWatchlists.push(newList);
     return newList;
   },
 
   deleteWatchlist: async (id: string) => {
+    const list = mockWatchlists.find(w => w.id === id);
+    if (list?.is_system_list) throw new Error("Cannot delete system list");
     mockWatchlists = mockWatchlists.filter(w => w.id !== id);
     mockItems = mockItems.filter(i => i.watchlist_id !== id);
     return true;
@@ -74,10 +79,13 @@ export const supabaseMock = {
   },
 
   addItemToWatchlist: async (watchlistId: string, movie: any) => {
+    // Check if already in this specific list
+    const exists = mockItems.find(i => i.watchlist_id === watchlistId && i.media_id === String(movie.id));
+    if (exists) return exists;
+
     const newItem: WatchlistItem = {
       id: `item_${Math.random().toString(36).substr(2, 9)}`,
       watchlist_id: watchlistId,
-      // Fixed: Ensuring media_id is always stored as a string
       media_id: String(movie.id),
       media_type: movie.media_type || 'movie',
       title: movie.title || movie.name,
@@ -86,7 +94,6 @@ export const supabaseMock = {
     };
     mockItems.push(newItem);
     
-    // Update count
     const list = mockWatchlists.find(w => w.id === watchlistId);
     if (list) list.item_count = (list.item_count || 0) + 1;
     
@@ -100,6 +107,16 @@ export const supabaseMock = {
       if (list && list.item_count) list.item_count -= 1;
     }
     mockItems = mockItems.filter(i => i.id !== itemId);
+    return true;
+  },
+
+  removeMovieFromWatchlist: async (watchlistId: string, mediaId: string) => {
+    const item = mockItems.find(i => i.watchlist_id === watchlistId && i.media_id === mediaId);
+    if (item) {
+      const list = mockWatchlists.find(w => w.id === watchlistId);
+      if (list && list.item_count) list.item_count -= 1;
+      mockItems = mockItems.filter(i => i.id !== item.id);
+    }
     return true;
   }
 };

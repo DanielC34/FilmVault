@@ -5,6 +5,8 @@ import { ICONS, TMDB_IMAGE_BASE, BACKDROP_SIZE, POSTER_SIZE } from '../constants
 import { geminiService } from '../services/geminiService';
 import { tmdbService } from '../services/tmdbService';
 import { MovieDetailSkeleton } from './Skeletons';
+import FavoriteButton from './FavoriteButton';
+import { useStore } from '../store/useStore';
 
 interface MovieDetailModalProps {
   movie: Movie;
@@ -14,10 +16,13 @@ interface MovieDetailModalProps {
 }
 
 const MovieDetailModal: React.FC<MovieDetailModalProps> = ({ movie, onClose, onAddToWatchlist, onCreateNewVault }) => {
+  const { favoriteIds, toggleFavorite } = useStore();
   const [insight, setInsight] = useState<string>('');
   const [loadingInsight, setLoadingInsight] = useState(true);
   const [fullMovie, setFullMovie] = useState<Movie>(movie);
   const [loadingDetails, setLoadingDetails] = useState(true);
+
+  const isFavorite = favoriteIds.has(String(movie.id));
 
   useEffect(() => {
     const fetchFullData = async () => {
@@ -137,9 +142,10 @@ const MovieDetailModal: React.FC<MovieDetailModalProps> = ({ movie, onClose, onA
               {ICONS.Plus}
               ADD TO VAULT
             </button>
-            <button className="p-4 bg-white/5 text-white/80 rounded-2xl border border-white/10 hover:bg-white/10 transition-all">
-              {ICONS.Heart}
-            </button>
+            <FavoriteButton 
+              isFavorite={isFavorite} 
+              onToggle={() => toggleFavorite(fullMovie)} 
+            />
           </div>
           <button 
             onClick={onCreateNewVault}

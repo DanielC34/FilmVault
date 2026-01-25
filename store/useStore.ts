@@ -11,6 +11,7 @@ interface AppActions {
   setTrendingPage: (page: number) => Promise<void>;
   createWatchlist: (title: string, description: string) => Promise<Watchlist | undefined>;
   addToWatchlist: (watchlistId: string, movie: Movie) => Promise<void>;
+  toggleFavorite: (movie: Movie) => Promise<void>;
   removeFromWatchlist: (itemId: string) => Promise<void>;
   deleteWatchlist: (id: string) => Promise<void>;
   fetchWatchlistItems: (watchlistId: string) => Promise<void>;
@@ -22,6 +23,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   user: null,
   watchlists: [],
   activeWatchlistItems: [],
+  favoriteIds: new Set(),
   isLoading: false,
   searchQuery: '',
   searchResults: [],
@@ -38,29 +40,23 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
       const user = await supabaseMock.getProfile();
       const watchlists = await supabaseMock.getWatchlists();
       
-      const response = await fetch(
-        `https://api.themoviedb.org/3/trending/all/day?api_key=f08f416251b2a32f3116e9be8cdd306a&page=1`
-      );
-      const data = await response.json();
-      const trending = data.results
-        .filter((item: any) => item.media_type !== 'person')
-        .map((item: any) => ({
-          id: String(item.id),
-          title: item.title || item.name || 'Unknown Title',
-          overview: item.overview || '',
-          poster_path: item.poster_path || '',
-          backdrop_path: item.backdrop_path || '',
-          release_date: item.release_date || item.first_air_date || '',
-          vote_average: item.vote_average || 0,
-          media_type: item.media_type || (item.title ? 'movie' : 'tv'),
-        }));
+      // Load Favorites set
+      const favList = watchlists.find(w => w.is_system_list);
+      let favorites = new Set<string>();
+      if (favList) {
+        const items = await supabaseMock.getWatchlistItems(favList.id);
+        favorites = new Set(items.map(i => i.media_id));
+      }
+
+      const trending = await tmdbService.getTrending(1);
 
       set({ 
         user, 
         watchlists, 
+        favoriteIds: favorites,
         trendingMovies: trending, 
         trendingPage: 1, 
-        totalTrendingPages: Math.min(data.total_pages, 500), // TMDB caps at 500
+        totalTrendingPages: 500,
         isLoading: false 
       });
     } catch (error) {
@@ -86,25 +82,9 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
     if (query.length > 2) {
       set({ isLoading: true });
       try {
-        const response = await fetch(
-          `https://api.themoviedb.org/3/search/multi?api_key=f08f416251b2a32f3116e9be8cdd306a&query=${encodeURIComponent(query)}&page=1`
-        );
-        const data = await response.json();
-        const results = data.results
-          .filter((item: any) => item.media_type !== 'person' && (item.poster_path || item.backdrop_path))
-          .map((item: any) => ({
-            id: String(item.id),
-            title: item.title || item.name || 'Unknown Title',
-            overview: item.overview || '',
-            poster_path: item.poster_path || '',
-            backdrop_path: item.backdrop_path || '',
-            release_date: item.release_date || item.first_air_date || '',
-            vote_average: item.vote_average || 0,
-            media_type: item.media_type || (item.title ? 'movie' : 'tv'),
-          }));
+        const results = await tmdbService.search(query, 1);
         set({ 
           searchResults: results, 
-          totalSearchPages: data.total_pages,
           isLoading: false 
         });
       } catch (error) {
@@ -120,22 +100,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
     if (!searchQuery) return;
     set({ isLoading: true, searchPage: page });
     try {
-      const response = await fetch(
-        `https://api.themoviedb.org/3/search/multi?api_key=f08f416251b2a32f3116e9be8cdd306a&query=${encodeURIComponent(searchQuery)}&page=${page}`
-      );
-      const data = await response.json();
-      const results = data.results
-        .filter((item: any) => item.media_type !== 'person' && (item.poster_path || item.backdrop_path))
-        .map((item: any) => ({
-          id: String(item.id),
-          title: item.title || item.name || 'Unknown Title',
-          overview: item.overview || '',
-          poster_path: item.poster_path || '',
-          backdrop_path: item.backdrop_path || '',
-          release_date: item.release_date || item.first_air_date || '',
-          vote_average: item.vote_average || 0,
-          media_type: item.media_type || (item.title ? 'movie' : 'tv'),
-        }));
+      const results = await tmdbService.search(searchQuery, page);
       set({ searchResults: results, isLoading: false });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
@@ -146,26 +111,43 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   setTrendingPage: async (page: number) => {
     set({ isLoading: true, trendingPage: page });
     try {
-      const response = await fetch(
-        `https://api.themoviedb.org/3/trending/all/day?api_key=f08f416251b2a32f3116e9be8cdd306a&page=${page}`
-      );
-      const data = await response.json();
-      const trending = data.results
-        .filter((item: any) => item.media_type !== 'person')
-        .map((item: any) => ({
-          id: String(item.id),
-          title: item.title || item.name || 'Unknown Title',
-          overview: item.overview || '',
-          poster_path: item.poster_path || '',
-          backdrop_path: item.backdrop_path || '',
-          release_date: item.release_date || item.first_air_date || '',
-          vote_average: item.vote_average || 0,
-          media_type: item.media_type || (item.title ? 'movie' : 'tv'),
-        }));
+      const trending = await tmdbService.getTrending(page);
       set({ trendingMovies: trending, isLoading: false });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       set({ isLoading: false });
+    }
+  },
+
+  toggleFavorite: async (movie: Movie) => {
+    const { favoriteIds, watchlists } = get();
+    const favList = watchlists.find(w => w.is_system_list);
+    if (!favList) return;
+
+    const isFav = favoriteIds.has(String(movie.id));
+    
+    // Optimistic Update
+    const newFavs = new Set(favoriteIds);
+    if (isFav) newFavs.delete(String(movie.id));
+    else newFavs.add(String(movie.id));
+    set({ favoriteIds: newFavs });
+
+    try {
+      if (isFav) {
+        await supabaseMock.removeMovieFromWatchlist(favList.id, String(movie.id));
+        get().showToast(`Removed from Favorites.`);
+      } else {
+        await supabaseMock.addItemToWatchlist(favList.id, movie);
+        get().showToast(`Added to Favorites.`);
+      }
+      
+      // Refresh watchlists to update counts
+      const updatedWatchlists = await supabaseMock.getWatchlists();
+      set({ watchlists: updatedWatchlists });
+    } catch (error) {
+      // Revert on error
+      set({ favoriteIds });
+      get().showToast('Failed to update favorites.', 'error');
     }
   },
 
@@ -224,6 +206,10 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   deleteWatchlist: async (id: string) => {
     try {
       const list = get().watchlists.find(w => w.id === id);
+      if (list?.is_system_list) {
+        get().showToast('Protected vault cannot be deleted.', 'info');
+        return;
+      }
       await supabaseMock.deleteWatchlist(id);
       set(state => ({ watchlists: state.watchlists.filter(w => w.id !== id) }));
       get().showToast(`Vault "${list?.title || 'Archive'}" deleted.`);

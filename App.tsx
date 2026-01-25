@@ -85,6 +85,11 @@ const App: React.FC = () => {
   };
 
   const handleDeleteVault = async (id: string) => {
+    const list = watchlists.find(w => w.id === id);
+    if (list?.is_system_list) {
+      alert("System vaults cannot be deleted.");
+      return;
+    }
     if (window.confirm('Are you sure you want to delete this vault? All saved items will be lost.')) {
       await deleteWatchlist(id);
       setViewingWatchlist(null);
@@ -98,7 +103,12 @@ const App: React.FC = () => {
     return true;
   });
 
-  // Root loading removed to allow Layout and skeletons to show
+  const sortedWatchlists = [...watchlists].sort((a, b) => {
+    if (a.is_system_list) return -1;
+    if (b.is_system_list) return 1;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
   const isInitialLoading = isLoading && trendingMovies.length === 0 && activeTab === 'home';
 
   return (
@@ -203,18 +213,25 @@ const App: React.FC = () => {
                   [...Array(3)].map((_, i) => <VaultCardSkeleton key={i} />)
                 ) : (
                   <>
-                    {watchlists.map(list => (
+                    {sortedWatchlists.map(list => (
                       <button 
                         key={list.id}
                         onClick={() => openWatchlist(list)}
-                        className="w-full flex items-center justify-between p-6 rounded-[24px] bg-[#1a2128] border border-white/5 hover:border-white/20 hover:bg-[#2c343c]/30 transition-all group relative overflow-hidden shadow-xl"
+                        className={`w-full flex items-center justify-between p-6 rounded-[24px] bg-[#1a2128] border hover:border-white/20 hover:bg-[#2c343c]/30 transition-all group relative overflow-hidden shadow-xl ${
+                          list.is_system_list ? 'border-[#ff8000]/30' : 'border-white/5'
+                        }`}
                       >
                         <div className="flex items-center gap-5 relative z-10 text-left">
-                          <div className="w-14 h-14 bg-[#14181c] rounded-2xl flex items-center justify-center text-[#00e054] shadow-inner">
-                            {ICONS.List}
+                          <div className={`w-14 h-14 bg-[#14181c] rounded-2xl flex items-center justify-center shadow-inner ${
+                            list.is_system_list ? 'text-[#ff8000]' : 'text-[#00e054]'
+                          }`}>
+                            {list.is_system_list ? ICONS.Heart : ICONS.List}
                           </div>
                           <div className="text-left">
-                            <h4 className="text-lg font-black text-white group-hover:text-[#00e054] transition-colors">{list.title}</h4>
+                            <h4 className="text-lg font-black text-white group-hover:text-[#00e054] transition-colors">
+                              {list.title}
+                              {list.is_system_list && <span className="ml-2 text-[8px] px-1.5 py-0.5 bg-[#ff8000]/20 text-[#ff8000] rounded uppercase tracking-tighter">Core</span>}
+                            </h4>
                             <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mt-1">{list.item_count || 0} ITEMS IN VAULT</p>
                           </div>
                         </div>
@@ -253,12 +270,14 @@ const App: React.FC = () => {
                     <h2 className="text-4xl font-black text-white leading-tight">{viewingWatchlist.title}</h2>
                     <p className="text-white/40 text-sm font-medium mt-2 max-w-md">{viewingWatchlist.description || "No description provided."}</p>
                   </div>
-                  <button 
-                    onClick={() => handleDeleteVault(viewingWatchlist.id)}
-                    className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 transition-colors"
-                  >
-                    {ICONS.Trash}
-                  </button>
+                  {!viewingWatchlist.is_system_list && (
+                    <button 
+                      onClick={() => handleDeleteVault(viewingWatchlist.id)}
+                      className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 transition-colors"
+                    >
+                      {ICONS.Trash}
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-white/30">
@@ -459,7 +478,7 @@ const App: React.FC = () => {
       {showAddSheet && (
         <AddToWatchlistSheet 
           movie={showAddSheet} 
-          watchlists={watchlists} 
+          watchlists={sortedWatchlists} 
           onAdd={handleAdd} 
           onClose={() => setShowAddSheet(null)} 
           onCreateNew={() => {
