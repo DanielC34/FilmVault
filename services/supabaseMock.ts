@@ -44,7 +44,8 @@ let mockItems: WatchlistItem[] = [
     media_type: 'movie',
     title: 'Fight Club',
     poster_path: '/pB8BjbpvovmBwi0pSHExrS9eZ3n.jpg',
-    added_at: new Date().toISOString()
+    added_at: new Date().toISOString(),
+    is_watched: false
   }
 ];
 
@@ -86,7 +87,7 @@ export const supabaseMock = {
       description,
       created_at: new Date().toISOString(),
       item_count: 0,
-      is_system_list: false
+      is_system_list: title === 'Already Watched'
     };
     mockWatchlists.push(newList);
     return newList;
@@ -115,7 +116,8 @@ export const supabaseMock = {
       media_type: movie.media_type || 'movie',
       title: movie.title || movie.name,
       poster_path: movie.poster_path,
-      added_at: new Date().toISOString()
+      added_at: new Date().toISOString(),
+      is_watched: false
     };
     mockItems.push(newItem);
     
@@ -143,5 +145,45 @@ export const supabaseMock = {
       mockItems = mockItems.filter(i => i.id !== item.id);
     }
     return true;
+  },
+
+  toggleWatchedStatus: async (itemId: string) => {
+    const item = mockItems.find(i => i.id === itemId);
+    if (!item) return;
+
+    item.is_watched = !item.is_watched;
+
+    if (item.is_watched) {
+      // Ensure "Already Watched" list exists
+      let watchedList = mockWatchlists.find(w => w.title === 'Already Watched');
+      if (!watchedList) {
+        watchedList = {
+          id: 'wl_watched',
+          user_id: item.watchlist_id, // approximation
+          title: 'Already Watched',
+          description: 'A complete record of your cinematic journey.',
+          created_at: new Date().toISOString(),
+          item_count: 0,
+          is_system_list: true
+        };
+        mockWatchlists.push(watchedList);
+      }
+
+      // Add to "Already Watched" if not present
+      const alreadyInHistory = mockItems.find(i => i.watchlist_id === watchedList!.id && i.media_id === item.media_id);
+      if (!alreadyInHistory) {
+        const historyItem: WatchlistItem = {
+          ...item,
+          id: `item_hist_${Math.random().toString(36).substr(2, 9)}`,
+          watchlist_id: watchedList!.id,
+          added_at: new Date().toISOString(),
+          is_watched: true
+        };
+        mockItems.push(historyItem);
+        watchedList.item_count = (watchedList.item_count || 0) + 1;
+      }
+    }
+
+    return item.is_watched;
   }
 };

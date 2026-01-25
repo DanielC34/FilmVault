@@ -38,6 +38,7 @@ const App: React.FC = () => {
     fetchWatchlistItems,
     removeFromWatchlist,
     deleteWatchlist,
+    toggleWatchedStatus,
     user,
     toast,
     hideToast
@@ -54,15 +55,12 @@ const App: React.FC = () => {
   useEffect(() => {
     init();
 
-    // Deep link handling logic (Simulated for Web, but matches Expo logic)
     const handleUrl = async (url: string) => {
       const { data, error } = await supabase.auth.getSession();
       if (data?.session) {
-        // Session handled by onAuthStateChange in useStore
       }
     };
 
-    // Web-based simulated link check
     if (window.location.hash || window.location.search) {
        handleUrl(window.location.href);
     }
@@ -143,13 +141,10 @@ const App: React.FC = () => {
 
   return (
     <Layout activeTab={activeTab} onTabChange={(tab) => { setActiveTab(tab); setViewingWatchlist(null); }}>
-      {/* Toast Notification */}
       {toast && <ToastNotification toast={toast} onClose={hideToast} />}
 
-      {/* Home / Feed View */}
       {activeTab === 'home' && (
         <div className="space-y-8 animate-in fade-in duration-700 pb-32">
-          {/* Hero Section */}
           <div className="px-4 py-2">
             <h2 className="text-white/40 text-[10px] font-black uppercase tracking-[0.4em] mb-4">Trending Now</h2>
             <div className="flex overflow-x-auto gap-4 pb-4 no-scrollbar -mx-4 px-4">
@@ -184,7 +179,6 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Filter Chips */}
           <div className="px-4 flex gap-2">
             {['all', 'movies', 'tv'].map((f) => (
               <button
@@ -201,10 +195,8 @@ const App: React.FC = () => {
             ))}
           </div>
 
-          {/* Grid Section */}
           <div className="px-4">
             <h2 className="text-white/40 text-[10px] font-black uppercase tracking-[0.4em] mb-6 text-left">Discovery Archive</h2>
-            
             <div className="grid grid-cols-3 gap-4">
               {isLoading ? (
                 [...Array(12)].map((_, i) => <MovieCardSkeleton key={i} />)
@@ -214,7 +206,6 @@ const App: React.FC = () => {
                 ))
               )}
             </div>
-
             <Pagination 
               currentPage={trendingPage} 
               totalPages={totalTrendingPages} 
@@ -225,7 +216,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Vault / Lists View */}
       {activeTab === 'lists' && (
         <div className="px-6 space-y-8 animate-in slide-in-from-right duration-500 pb-32">
           {!viewingWatchlist ? (
@@ -248,19 +238,22 @@ const App: React.FC = () => {
                         key={list.id}
                         onClick={() => openWatchlist(list)}
                         className={`w-full flex items-center justify-between p-6 rounded-[24px] bg-[#1a2128] border hover:border-white/20 hover:bg-[#2c343c]/30 transition-all group relative overflow-hidden shadow-xl ${
-                          list.is_system_list ? 'border-[#ff8000]/30' : 'border-white/5'
+                          list.title === 'Favorites' ? 'border-[#ff8000]/30' : 
+                          list.title === 'Already Watched' ? 'border-[#00e054]/30' : 'border-white/5'
                         }`}
                       >
                         <div className="flex items-center gap-5 relative z-10 text-left">
                           <div className={`w-14 h-14 bg-[#14181c] rounded-2xl flex items-center justify-center shadow-inner ${
-                            list.is_system_list ? 'text-[#ff8000]' : 'text-[#00e054]'
+                            list.title === 'Favorites' ? 'text-[#ff8000]' : 
+                            list.title === 'Already Watched' ? 'text-[#00e054]' : 'text-white/60'
                           }`}>
-                            {list.is_system_list ? ICONS.Heart : ICONS.List}
+                            {list.title === 'Favorites' ? ICONS.Heart : 
+                             list.title === 'Already Watched' ? ICONS.Check : ICONS.List}
                           </div>
                           <div className="text-left">
                             <h4 className="text-lg font-black text-white group-hover:text-[#00e054] transition-colors">
                               {list.title}
-                              {list.is_system_list && <span className="ml-2 text-[8px] px-1.5 py-0.5 bg-[#ff8000]/20 text-[#ff8000] rounded uppercase tracking-tighter">Core</span>}
+                              {list.is_system_list && <span className="ml-2 text-[8px] px-1.5 py-0.5 bg-white/5 text-white/30 rounded uppercase tracking-tighter">Core</span>}
                             </h4>
                             <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mt-1">{list.item_count || 0} ITEMS IN VAULT</p>
                           </div>
@@ -336,34 +329,53 @@ const App: React.FC = () => {
                         })}
                         className="w-full text-left focus:outline-none"
                       >
-                        <div className="aspect-[2/3] w-full rounded-lg overflow-hidden relative shadow-lg bg-[#2c343c]">
+                        <div className={`aspect-[2/3] w-full rounded-lg overflow-hidden relative shadow-lg bg-[#2c343c] transition-opacity duration-300 ${item.is_watched ? 'opacity-40' : 'opacity-100'}`}>
                           <img 
                             src={item.poster_path ? `${TMDB_IMAGE_BASE}${POSTER_SIZE}${item.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Poster'} 
                             alt={item.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             onError={(e: any) => { e.target.src = 'https://via.placeholder.com/500x750?text=No+Poster'; }}
                           />
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                             <div className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20">
-                               {ICONS.ChevronRight}
+                          {item.is_watched && (
+                             <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                <div className="p-2 bg-[#00e054] text-black rounded-full shadow-lg border-2 border-white/20 animate-in zoom-in-50">
+                                   {ICONS.Check}
+                                </div>
                              </div>
-                          </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                         </div>
                         <h4 className="mt-2 text-[10px] font-bold text-white/80 truncate group-hover:text-white">{item.title}</h4>
                       </button>
                       
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (window.confirm(`Remove "${item.title}" from this vault?`)) {
-                            removeFromWatchlist(item.id);
-                          }
-                        }}
-                        className="absolute -top-1.5 -right-1.5 p-1.5 bg-[#14181c] text-red-500 rounded-full border border-red-500/20 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all shadow-xl z-20 hover:bg-red-500 hover:text-white"
-                        title="Remove from vault"
-                      >
-                        <div className="scale-[0.85]">{ICONS.X}</div>
-                      </button>
+                      <div className="absolute -top-1.5 -right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleWatchedStatus(item.id);
+                          }}
+                          className={`p-1.5 rounded-full border shadow-xl transition-all ${
+                            item.is_watched 
+                              ? 'bg-[#00e054] text-black border-[#00e054]' 
+                              : 'bg-[#14181c] text-white/60 border-white/10 hover:text-[#00e054]'
+                          }`}
+                          title={item.is_watched ? "Mark as unwatched" : "Mark as watched"}
+                        >
+                          <div className="scale-[0.85]">{item.is_watched ? ICONS.Check : ICONS.Eye}</div>
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Remove "${item.title}" from this vault?`)) {
+                              removeFromWatchlist(item.id);
+                            }
+                          }}
+                          className="p-1.5 bg-[#14181c] text-red-500 rounded-full border border-red-500/20 shadow-xl hover:bg-red-500 hover:text-white"
+                          title="Remove from vault"
+                        >
+                          <div className="scale-[0.85]">{ICONS.X}</div>
+                        </button>
+                      </div>
                     </div>
                   ))
                 ) : (
@@ -383,7 +395,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Search View */}
       {activeTab === 'search' && (
         <div className="px-6 animate-in slide-in-from-left duration-500 pb-32">
            <div className="sticky top-20 z-30 pt-4 pb-6 bg-[#14181c]">
@@ -417,7 +428,6 @@ const App: React.FC = () => {
                    </div>
                  )}
                </div>
-               
                <Pagination 
                  currentPage={searchPage} 
                  totalPages={totalSearchPages} 
@@ -437,7 +447,6 @@ const App: React.FC = () => {
                     ))}
                   </div>
                 </section>
-                
                 <section>
                   <h3 className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mb-4">Trending Today</h3>
                    <div className="grid grid-cols-3 gap-4">
@@ -451,7 +460,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Me View */}
       {activeTab === 'profile' && user && (
         <div className="px-6 space-y-8 animate-in fade-in duration-500 text-center pb-32">
           <div className="pt-12 flex flex-col items-center">
@@ -465,7 +473,6 @@ const App: React.FC = () => {
             <h2 className="text-3xl font-black text-white">@{user.username}</h2>
             <p className="text-white/40 text-xs font-bold uppercase tracking-[0.2em] mt-2">Executive Curator</p>
           </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-[#1a2128] p-6 rounded-3xl border border-white/5">
               <span className="text-3xl font-black text-white">124</span>
@@ -476,7 +483,6 @@ const App: React.FC = () => {
               <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mt-1">Active Vaults</p>
             </div>
           </div>
-          
           <div className="space-y-3 text-left">
             <button className="w-full p-5 rounded-2xl bg-white/5 text-white text-sm font-bold flex items-center justify-between">
               Account Settings
@@ -492,7 +498,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Modals & Overlays */}
       {selectedMovie && (
         <MovieDetailModal 
           movie={selectedMovie} 

@@ -14,7 +14,9 @@ import {
   Trash2,
   Heart,
   Sparkles,
-  X
+  X,
+  Check,
+  Eye
 } from 'lucide-react';
 
 export const THEME = {
@@ -44,5 +46,7 @@ export const ICONS = {
   Trash: <Trash2 size={20} />,
   Heart: <Heart size={20} />,
   Sparkles: <Sparkles size={16} />,
-  X: <X size={16} />
+  X: <X size={16} />,
+  Check: <Check size={16} />,
+  Eye: <Eye size={16} />
 };

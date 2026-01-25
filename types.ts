@@ -36,6 +36,7 @@ export interface WatchlistItem {
   title: string;
   poster_path: string;
   added_at: string;
+  is_watched?: boolean;
 }
 
 export interface Toast {

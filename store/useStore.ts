@@ -19,6 +19,7 @@ interface AppActions {
   createWatchlist: (title: string, description: string) => Promise<Watchlist | undefined>;
   addToWatchlist: (watchlistId: string, movie: Movie) => Promise<void>;
   toggleFavorite: (movie: Movie) => Promise<void>;
+  toggleWatchedStatus: (itemId: string) => Promise<void>;
   removeFromWatchlist: (itemId: string) => Promise<void>;
   deleteWatchlist: (id: string) => Promise<void>;
   fetchWatchlistItems: (watchlistId: string) => Promise<void>;
@@ -83,7 +84,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
       const userId = session?.user?.id;
       const user = await supabaseMock.getProfile(userId);
       const watchlists = await supabaseMock.getWatchlists();
-      const favList = watchlists.find(w => w.is_system_list);
+      const favList = watchlists.find(w => w.is_system_list && w.title === 'Favorites');
       let favorites = new Set<string>();
       if (favList) {
         const items = await supabaseMock.getWatchlistItems(favList.id);
@@ -108,7 +109,6 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
 
   signInWithPassword: async (email, password) => {
     if (!isSupabaseConfigured()) {
-      // Simulate login success in mock mode
       set({ isAuthLoading: true });
       const fakeSession = { user: { id: `user_${Math.random().toString(36).substr(2, 9)}`, email }, access_token: 'mock_token' };
       localStorage.setItem('fv_mock_session', JSON.stringify(fakeSession));
@@ -132,7 +132,6 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
 
   signUpWithEmail: async (email, password) => {
     if (!isSupabaseConfigured()) {
-      // Simulate signup success in mock mode
       set({ isAuthLoading: true });
       const newUser = await supabaseMock.register(email);
       const fakeSession = { user: { id: newUser.id, email }, access_token: 'mock_token' };
@@ -238,7 +237,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
 
   toggleFavorite: async (movie: Movie) => {
     const { favoriteIds, watchlists } = get();
-    const favList = watchlists.find(w => w.is_system_list);
+    const favList = watchlists.find(w => w.is_system_list && w.title === 'Favorites');
     if (!favList) return;
     const isFav = favoriteIds.has(String(movie.id));
     const newFavs = new Set(favoriteIds);
@@ -258,6 +257,21 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
     } catch (error) {
       set({ favoriteIds });
       get().showToast('Failed to update favorites.', 'error');
+    }
+  },
+
+  toggleWatchedStatus: async (itemId: string) => {
+    try {
+      const result = await supabaseMock.toggleWatchedStatus(itemId);
+      const items = get().activeWatchlistItems.map(item => 
+        item.id === itemId ? { ...item, is_watched: result } : item
+      );
+      set({ activeWatchlistItems: items });
+      const watchlists = await supabaseMock.getWatchlists();
+      set({ watchlists });
+      get().showToast(result ? "Archived in history." : "Returned to watchlist.");
+    } catch (error) {
+      get().showToast("Failed to update status.", "error");
     }
   },
 
