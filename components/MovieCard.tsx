@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Movie } from '../types';
-import { ICONS } from '../constants';
+import { ICONS, TMDB_IMAGE_BASE, POSTER_SIZE } from '../constants';
 
 interface MovieCardProps {
   movie: Movie;
@@ -9,9 +9,8 @@ interface MovieCardProps {
 }
 
 const MovieCard: React.FC<MovieCardProps> = ({ movie, onClick }) => {
-  // OMDB provides full URLs in poster_path now
-  const posterUrl = movie.poster_path && movie.poster_path !== 'N/A'
-    ? movie.poster_path
+  const posterUrl = movie.poster_path 
+    ? `${TMDB_IMAGE_BASE}${POSTER_SIZE}${movie.poster_path}`
     : 'https://via.placeholder.com/500x750?text=No+Poster';
 
   return (

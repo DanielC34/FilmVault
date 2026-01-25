@@ -1,77 +1,64 @@
 
-import { Movie } from '../types';
+import { Movie, MediaType } from '../types';
 
-const OMDB_API_KEY = '9d7df543';
-const BASE_URL = 'https://www.omdbapi.com/';
+const API_KEY = 'f08f416251b2a32f3116e9be8cdd306a';
+const BASE_URL = 'https://api.themoviedb.org/3';
 
 const normalizeResult = (item: any): Movie => ({
-  id: item.imdbID,
-  title: item.Title || 'Unknown Title',
-  overview: item.Plot || '',
-  poster_path: item.Poster !== 'N/A' ? item.Poster : '',
-  backdrop_path: item.Poster !== 'N/A' ? item.Poster : '', // OMDB doesn't provide backdrops easily
-  release_date: item.Released || item.Year || '',
-  vote_average: item.imdbRating !== 'N/A' ? parseFloat(item.imdbRating) : 0,
-  media_type: item.Type === 'series' ? 'tv' : 'movie',
+  id: String(item.id),
+  title: item.title || item.name || 'Unknown Title',
+  overview: item.overview || '',
+  poster_path: item.poster_path || '',
+  backdrop_path: item.backdrop_path || '',
+  release_date: item.release_date || item.first_air_date || '',
+  vote_average: item.vote_average || 0,
+  media_type: item.media_type || (item.title ? 'movie' : 'tv'),
 });
 
 export const tmdbService = {
-  getTrending: async (): Promise<Movie[]> => {
+  getTrending: async (page: number = 1): Promise<Movie[]> => {
     try {
-      // OMDB doesn't have a "trending" endpoint. 
-      // We'll simulate it by searching for some currently popular keywords.
-      const keywords = ['Marvel', 'Batman', 'Star Wars', 'Stranger Things'];
-      const randomKeyword = keywords[Math.floor(Math.random() * keywords.length)];
-      
-      const response = await fetch(`${BASE_URL}?apikey=${OMDB_API_KEY}&s=${randomKeyword}&type=movie`);
-      if (!response.ok) throw new Error('Failed to fetch simulated trending');
-      
-      const data = await response.json();
-      if (data.Response === 'False') return [];
-
-      // Fetch details for the first few to get Plot and Rating
-      const detailedResults = await Promise.all(
-        data.Search.slice(0, 8).map(async (item: any) => {
-          const detailRes = await fetch(`${BASE_URL}?apikey=${OMDB_API_KEY}&i=${item.imdbID}`);
-          return detailRes.json();
-        })
+      const response = await fetch(
+        `${BASE_URL}/trending/all/day?api_key=${API_KEY}&page=${page}`
       );
-
-      return detailedResults.map(normalizeResult);
+      if (!response.ok) throw new Error('Failed to fetch trending');
+      const data = await response.json();
+      return data.results
+        .filter((item: any) => item.media_type !== 'person')
+        .map(normalizeResult);
     } catch (error) {
-      console.error('OMDB Error (Trending Simulation):', error);
+      console.error('TMDB Trending Error:', error);
       return [];
     }
   },
 
-  search: async (query: string): Promise<Movie[]> => {
+  search: async (query: string, page: number = 1): Promise<Movie[]> => {
     if (!query) return [];
     try {
-      const response = await fetch(`${BASE_URL}?apikey=${OMDB_API_KEY}&s=${encodeURIComponent(query)}`);
+      const response = await fetch(
+        `${BASE_URL}/search/multi?api_key=${API_KEY}&query=${encodeURIComponent(query)}&page=${page}`
+      );
       if (!response.ok) throw new Error('Search failed');
       const data = await response.json();
-      
-      if (data.Response === 'False') return [];
-
-      // For search results, we often just get Title, Year, imdbID, Type, Poster.
-      // We return them normalized. Note: Overview will be empty until details are fetched.
-      return data.Search.map((item: any) => normalizeResult(item));
+      return data.results
+        .filter((item: any) => item.media_type !== 'person' && (item.poster_path || item.backdrop_path))
+        .map(normalizeResult);
     } catch (error) {
-      console.error('OMDB Search Error:', error);
+      console.error('TMDB Search Error:', error);
       return [];
     }
   },
 
-  getDetails: async (id: string): Promise<Movie | null> => {
+  getDetails: async (id: string, type: MediaType): Promise<Movie | null> => {
     try {
-      const response = await fetch(`${BASE_URL}?apikey=${OMDB_API_KEY}&i=${id}&plot=full`);
+      const response = await fetch(
+        `${BASE_URL}/${type}/${id}?api_key=${API_KEY}&append_to_response=videos,credits`
+      );
       if (!response.ok) throw new Error('Details fetch failed');
       const data = await response.json();
-      
-      if (data.Response === 'False') return null;
-      return normalizeResult(data);
+      return normalizeResult({ ...data, media_type: type });
     } catch (error) {
-      console.error('OMDB Details Error:', error);
+      console.error('TMDB Details Error:', error);
       return null;
     }
   }

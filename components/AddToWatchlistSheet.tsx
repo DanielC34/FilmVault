@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Watchlist, Movie } from '../types';
-import { ICONS, THEME } from '../constants';
+import { ICONS, TMDB_IMAGE_BASE, POSTER_SIZE } from '../constants';
 
 interface AddToWatchlistSheetProps {
   movie: Movie;
@@ -12,6 +12,10 @@ interface AddToWatchlistSheetProps {
 }
 
 const AddToWatchlistSheet: React.FC<AddToWatchlistSheetProps> = ({ movie, watchlists, onAdd, onClose, onCreateNew }) => {
+  const posterUrl = movie.poster_path 
+    ? `${TMDB_IMAGE_BASE}${POSTER_SIZE}${movie.poster_path}`
+    : 'https://via.placeholder.com/200x300?text=No+Poster';
+
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="absolute inset-0" onClick={onClose} />
@@ -21,14 +25,13 @@ const AddToWatchlistSheet: React.FC<AddToWatchlistSheetProps> = ({ movie, watchl
         <div className="flex gap-4 mb-8">
           <div className="w-20 aspect-[2/3] rounded-lg overflow-hidden shadow-lg flex-shrink-0 bg-[#2c343c]">
             <img 
-              src={movie.poster_path} 
+              src={posterUrl} 
               className="w-full h-full object-cover"
               alt={movie.title}
-              // Fixed: Correct React camelCase naming for event handler
               onError={(e: any) => { e.target.src = 'https://via.placeholder.com/200x300?text=No+Poster'; }}
             />
           </div>
-          <div className="flex flex-col justify-center">
+          <div className="flex flex-col justify-center text-left">
             <h2 className="text-xl font-bold text-white leading-tight">Add to Vault</h2>
             <p className="text-white/60 text-sm font-medium">{movie.title}</p>
           </div>

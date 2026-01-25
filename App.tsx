@@ -7,7 +7,7 @@ import MovieDetailModal from './components/MovieDetailModal';
 import AddToWatchlistSheet from './components/AddToWatchlistSheet';
 import CreateWatchlistModal from './components/CreateWatchlistModal';
 import { Movie, Watchlist, WatchlistItem } from './types';
-import { ICONS, THEME } from './constants';
+import { ICONS, THEME, TMDB_IMAGE_BASE, BACKDROP_SIZE, POSTER_SIZE } from './constants';
 import { geminiService } from './services/geminiService';
 
 const App: React.FC = () => {
@@ -17,9 +17,12 @@ const App: React.FC = () => {
     searchResults, 
     searchQuery, 
     setSearchQuery, 
+    loadMoreSearch,
+    loadMoreTrending,
     watchlists, 
     activeWatchlistItems,
     isLoading,
+    isMoreLoading,
     addToWatchlist,
     createWatchlist,
     fetchWatchlistItems,
@@ -59,8 +62,15 @@ const App: React.FC = () => {
   };
 
   const handleCreateVault = async (title: string, description: string) => {
-    await createWatchlist(title, description);
+    const newList = await createWatchlist(title, description);
     setIsCreatingVault(false);
+    
+    // Feature request: if we were in the middle of adding a movie to a watchlist,
+    // automatically add it to this new one we just created.
+    if (newList && showAddSheet) {
+      await addToWatchlist(newList.id, showAddSheet);
+      setShowAddSheet(null);
+    }
   };
 
   const openWatchlist = async (watchlist: Watchlist) => {
@@ -97,7 +107,7 @@ const App: React.FC = () => {
     <Layout activeTab={activeTab} onTabChange={(tab) => { setActiveTab(tab); setViewingWatchlist(null); }}>
       {/* Home / Feed View */}
       {activeTab === 'home' && (
-        <div className="space-y-8 animate-in fade-in duration-700">
+        <div className="space-y-8 animate-in fade-in duration-700 pb-32">
           {/* Hero Section */}
           <div className="px-4 py-2">
             <h2 className="text-white/40 text-[10px] font-black uppercase tracking-[0.4em] mb-4">Trending Now</h2>
@@ -109,8 +119,8 @@ const App: React.FC = () => {
                     className="w-full h-48 rounded-2xl overflow-hidden relative shadow-2xl border border-white/10 text-left"
                   >
                     <img 
-                      src={movie.backdrop_path || movie.poster_path}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-60"
+                      src={movie.backdrop_path ? `${TMDB_IMAGE_BASE}${BACKDROP_SIZE}${movie.backdrop_path}` : `${TMDB_IMAGE_BASE}${BACKDROP_SIZE}${movie.poster_path}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                       alt={movie.title}
                       onError={(e: any) => { e.target.src = 'https://via.placeholder.com/800x400?text=FilmVault'; }}
                     />
@@ -118,7 +128,7 @@ const App: React.FC = () => {
                     <div className="absolute bottom-4 left-4 right-4">
                       <h3 className="text-xl font-black text-white leading-tight">{movie.title}</h3>
                       <p className="text-white/60 text-xs font-bold mt-1 uppercase tracking-widest">
-                        {movie.release_date} • {movie.media_type.toUpperCase()}
+                        {movie.release_date ? new Date(movie.release_date).getFullYear() : 'TBA'} • {movie.media_type.toUpperCase()}
                       </p>
                     </div>
                   </button>
@@ -149,8 +159,24 @@ const App: React.FC = () => {
             <h2 className="text-white/40 text-[10px] font-black uppercase tracking-[0.4em] mb-6">Discovery</h2>
             <div className="grid grid-cols-3 gap-4">
               {filteredMovies.map(movie => (
-                <MovieCard key={movie.id} movie={movie} onClick={setSelectedMovie} />
+                <MovieCard key={`${movie.id}-${movie.media_type}`} movie={movie} onClick={setSelectedMovie} />
               ))}
+            </div>
+
+            {/* Load More Button */}
+            <div className="mt-12 mb-8 flex justify-center">
+              <button 
+                onClick={loadMoreTrending}
+                disabled={isMoreLoading}
+                className="px-10 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-black text-xs uppercase tracking-[0.3em] hover:bg-white/10 transition-all flex items-center gap-3 active:scale-95 disabled:opacity-50"
+              >
+                {isMoreLoading ? (
+                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                ) : (
+                  ICONS.Plus
+                )}
+                {isMoreLoading ? 'Consulting Archive...' : 'Load More Results'}
+              </button>
             </div>
           </div>
         </div>
@@ -158,12 +184,12 @@ const App: React.FC = () => {
 
       {/* Vault / Lists View */}
       {activeTab === 'lists' && (
-        <div className="px-6 space-y-8 animate-in slide-in-from-right duration-500">
+        <div className="px-6 space-y-8 animate-in slide-in-from-right duration-500 pb-32">
           {!viewingWatchlist ? (
             <>
               <header className="py-4">
-                <h2 className="text-3xl font-black text-white mb-2">My Vaults</h2>
-                <div className="p-4 bg-[#1a2128] border border-white/5 rounded-2xl text-[11px] font-medium text-white/50 italic flex gap-3 items-start">
+                <h2 className="text-3xl font-black text-white mb-2 text-left">My Vaults</h2>
+                <div className="p-4 bg-[#1a2128] border border-white/5 rounded-2xl text-[11px] font-medium text-white/50 italic flex gap-3 items-start text-left">
                    <div className="text-[#00e054] mt-0.5">{ICONS.Sparkles}</div>
                    <span>{vaultVibe || "Analyzing your cinematic taste..."}</span>
                 </div>
@@ -176,7 +202,7 @@ const App: React.FC = () => {
                     onClick={() => openWatchlist(list)}
                     className="w-full flex items-center justify-between p-6 rounded-[24px] bg-[#1a2128] border border-white/5 hover:border-white/20 hover:bg-[#2c343c]/30 transition-all group relative overflow-hidden shadow-xl"
                   >
-                    <div className="flex items-center gap-5 relative z-10">
+                    <div className="flex items-center gap-5 relative z-10 text-left">
                       <div className="w-14 h-14 bg-[#14181c] rounded-2xl flex items-center justify-center text-[#00e054] shadow-inner">
                         {ICONS.List}
                       </div>
@@ -214,7 +240,7 @@ const App: React.FC = () => {
                 </button>
                 
                 <div className="flex justify-between items-start">
-                  <div>
+                  <div className="text-left">
                     <h2 className="text-4xl font-black text-white leading-tight">{viewingWatchlist.title}</h2>
                     <p className="text-white/40 text-sm font-medium mt-2 max-w-md">{viewingWatchlist.description || "No description provided."}</p>
                   </div>
@@ -252,7 +278,7 @@ const App: React.FC = () => {
                       >
                         <div className="aspect-[2/3] w-full rounded-lg overflow-hidden relative shadow-lg bg-[#2c343c]">
                           <img 
-                            src={item.poster_path} 
+                            src={item.poster_path ? `${TMDB_IMAGE_BASE}${POSTER_SIZE}${item.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Poster'} 
                             alt={item.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             onError={(e: any) => { e.target.src = 'https://via.placeholder.com/500x750?text=No+Poster'; }}
@@ -293,9 +319,77 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Profile / Me View */}
+      {/* Search View */}
+      {activeTab === 'search' && (
+        <div className="px-6 animate-in slide-in-from-left duration-500 pb-32">
+           <div className="sticky top-20 z-30 pt-4 pb-6 bg-[#14181c]">
+             <div className="relative group">
+               <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-[#00e054] transition-colors">
+                 {ICONS.Search}
+               </div>
+               <input 
+                 type="text"
+                 placeholder="Search the archive..."
+                 value={searchQuery}
+                 onChange={(e) => setSearchQuery(e.target.value)}
+                 className="w-full pl-12 pr-6 py-5 bg-[#1a2128] border border-white/5 rounded-3xl text-white font-bold placeholder:text-white/20 focus:outline-none focus:border-[#00e054]/30 focus:bg-[#1a2128] shadow-xl transition-all"
+               />
+             </div>
+           </div>
+
+           {searchQuery.length > 0 ? (
+             <div>
+               <div className="grid grid-cols-3 gap-4">
+                 {searchResults.map(movie => (
+                   <MovieCard key={`${movie.id}-${movie.media_type}`} movie={movie} onClick={setSelectedMovie} />
+                 ))}
+                 {searchResults.length === 0 && !isLoading && (
+                   <div className="col-span-3 text-center py-20">
+                      <p className="text-white/20 font-black uppercase tracking-[0.2em]">No Matches Found</p>
+                   </div>
+                 )}
+               </div>
+               {searchResults.length > 0 && (
+                 <div className="mt-12 flex justify-center">
+                    <button 
+                      onClick={loadMoreSearch}
+                      disabled={isMoreLoading}
+                      className="px-10 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-black text-xs uppercase tracking-[0.3em] hover:bg-white/10 transition-all active:scale-95 disabled:opacity-50"
+                    >
+                      {isMoreLoading ? 'Consulting Archive...' : 'Load More Results'}
+                    </button>
+                 </div>
+               )}
+             </div>
+           ) : (
+             <div className="space-y-8">
+                <section>
+                  <h3 className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mb-4 text-left">Popular Genres</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {['Noir', 'Sci-Fi', 'Horror', 'Cyberpunk', 'Giallo', 'New Wave'].map(genre => (
+                      <button key={genre} className="px-5 py-3 rounded-2xl bg-[#1a2128] border border-white/5 text-xs font-bold text-white/60 hover:text-white transition-colors text-left">
+                        {genre}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+                
+                <section>
+                  <h3 className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mb-4 text-left">Recent Discoveries</h3>
+                   <div className="grid grid-cols-3 gap-4">
+                    {trendingMovies.slice(0, 3).map(movie => (
+                      <MovieCard key={`${movie.id}-discovery`} movie={movie} onClick={setSelectedMovie} />
+                    ))}
+                  </div>
+                </section>
+             </div>
+           )}
+        </div>
+      )}
+
+      {/* Me View */}
       {activeTab === 'profile' && user && (
-        <div className="px-6 space-y-8 animate-in fade-in duration-500 text-center">
+        <div className="px-6 space-y-8 animate-in fade-in duration-500 text-center pb-32">
           <div className="pt-12 flex flex-col items-center">
             <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-[#00e054] to-[#ff8000] mb-6 shadow-2xl">
               <img 
@@ -318,75 +412,16 @@ const App: React.FC = () => {
               <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mt-1">Active Vaults</p>
             </div>
           </div>
-
+          
           <div className="space-y-3 text-left">
             <button className="w-full p-5 rounded-2xl bg-white/5 text-white text-sm font-bold flex items-center justify-between">
               Account Settings
-              <div className="text-white/20">{ICONS.ChevronRight}</div>
-            </button>
-            <button className="w-full p-5 rounded-2xl bg-white/5 text-white text-sm font-bold flex items-center justify-between">
-              Privacy & Security
               <div className="text-white/20">{ICONS.ChevronRight}</div>
             </button>
             <button className="w-full p-5 rounded-2xl bg-red-500/10 text-red-500 text-sm font-bold">
               Sign Out
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Search View */}
-      {activeTab === 'search' && (
-        <div className="px-6 animate-in slide-in-from-left duration-500">
-           <div className="sticky top-20 z-30 pt-4 pb-6 bg-[#14181c]">
-             <div className="relative group">
-               <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-[#00e054] transition-colors">
-                 {ICONS.Search}
-               </div>
-               <input 
-                 type="text"
-                 placeholder="Search the archive..."
-                 value={searchQuery}
-                 onChange={(e) => setSearchQuery(e.target.value)}
-                 className="w-full pl-12 pr-6 py-5 bg-[#1a2128] border border-white/5 rounded-3xl text-white font-bold placeholder:text-white/20 focus:outline-none focus:border-[#00e054]/30 focus:bg-[#1a2128] shadow-xl transition-all"
-               />
-             </div>
-           </div>
-
-           {searchQuery.length > 0 ? (
-             <div className="grid grid-cols-3 gap-4 pb-32">
-               {searchResults.map(movie => (
-                 <MovieCard key={movie.id} movie={movie} onClick={setSelectedMovie} />
-               ))}
-               {searchResults.length === 0 && (
-                 <div className="col-span-3 text-center py-20">
-                    <p className="text-white/20 font-black uppercase tracking-[0.2em]">No Matches Found</p>
-                 </div>
-               )}
-             </div>
-           ) : (
-             <div className="space-y-8 pb-32">
-                <section>
-                  <h3 className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mb-4">Popular Genres</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {['Noir', 'Sci-Fi', 'Horror', 'Cyberpunk', 'Giallo', 'New Wave'].map(genre => (
-                      <button key={genre} className="px-5 py-3 rounded-2xl bg-[#1a2128] border border-white/5 text-xs font-bold text-white/60 hover:text-white transition-colors">
-                        {genre}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-                
-                <section>
-                  <h3 className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mb-4">Recent Discoveries</h3>
-                   <div className="grid grid-cols-3 gap-4">
-                    {trendingMovies.slice(0, 3).map(movie => (
-                      <MovieCard key={movie.id} movie={movie} onClick={setSelectedMovie} />
-                    ))}
-                  </div>
-                </section>
-             </div>
-           )}
         </div>
       )}
 

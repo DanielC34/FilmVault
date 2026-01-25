@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Movie } from '../types';
-import { ICONS } from '../constants';
+import { ICONS, TMDB_IMAGE_BASE, BACKDROP_SIZE, POSTER_SIZE } from '../constants';
 import { geminiService } from '../services/geminiService';
 import { tmdbService } from '../services/tmdbService';
 
@@ -21,7 +21,7 @@ const MovieDetailModal: React.FC<MovieDetailModalProps> = ({ movie, onClose, onA
   useEffect(() => {
     const fetchFullData = async () => {
       setLoadingDetails(true);
-      const detailed = await tmdbService.getDetails(movie.id);
+      const detailed = await tmdbService.getDetails(movie.id, movie.media_type);
       if (detailed) {
         setFullMovie(detailed);
       }
@@ -38,20 +38,25 @@ const MovieDetailModal: React.FC<MovieDetailModalProps> = ({ movie, onClose, onA
 
     fetchFullData();
     fetchInsight();
-  }, [movie.id, movie.title]);
+  }, [movie.id, movie.title, movie.media_type]);
 
-  const posterUrl = fullMovie.poster_path && fullMovie.poster_path !== 'N/A'
-    ? fullMovie.poster_path
+  const backdropUrl = fullMovie.backdrop_path 
+    ? `${TMDB_IMAGE_BASE}${BACKDROP_SIZE}${fullMovie.backdrop_path}`
+    : `${TMDB_IMAGE_BASE}${BACKDROP_SIZE}${fullMovie.poster_path}`;
+
+  const posterUrl = fullMovie.poster_path
+    ? `${TMDB_IMAGE_BASE}${POSTER_SIZE}${fullMovie.poster_path}`
     : 'https://via.placeholder.com/500x750?text=No+Poster';
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#14181c] overflow-y-auto animate-in fade-in slide-in-from-bottom-10 duration-500">
-      {/* Hero Backdrop (Simulated with Poster for OMDB) */}
+      {/* Hero Backdrop */}
       <div className="relative w-full h-[50vh] flex-shrink-0">
         <img 
-          src={posterUrl}
-          className="w-full h-full object-cover blur-sm opacity-40"
+          src={backdropUrl}
+          className="w-full h-full object-cover"
           alt={fullMovie.title}
+          onError={(e: any) => { e.target.style.display = 'none'; }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#14181c] via-[#14181c]/40 to-black/40" />
         
@@ -77,7 +82,7 @@ const MovieDetailModal: React.FC<MovieDetailModalProps> = ({ movie, onClose, onA
           <div className="flex-1 pb-2">
             <h1 className="text-3xl font-black text-white leading-tight mb-1">{fullMovie.title}</h1>
             <div className="flex items-center gap-3 text-white/60 text-xs font-bold uppercase tracking-widest">
-              <span>{fullMovie.release_date}</span>
+              <span>{fullMovie.release_date ? new Date(fullMovie.release_date).getFullYear() : 'TBA'}</span>
               <span>•</span>
               <div className="flex items-center gap-1 text-[#ff8000]">
                 {ICONS.Star}
