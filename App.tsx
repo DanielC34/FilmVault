@@ -8,14 +8,18 @@ import AddToWatchlistSheet from './components/AddToWatchlistSheet';
 import CreateWatchlistModal from './components/CreateWatchlistModal';
 import ToastNotification from './components/ToastNotification';
 import Pagination from './components/Pagination';
+import AuthScreen from './components/AuthScreen';
 import { MovieCardSkeleton, VaultCardSkeleton } from './components/Skeletons';
 import { Movie, Watchlist, WatchlistItem } from './types';
 import { ICONS, THEME, TMDB_IMAGE_BASE, BACKDROP_SIZE, POSTER_SIZE } from './constants';
 import { geminiService } from './services/geminiService';
+import { supabase } from './services/supabaseClient';
 
 const App: React.FC = () => {
   const { 
-    init, 
+    init,
+    session,
+    isAuthLoading,
     trendingMovies, 
     searchResults, 
     searchQuery, 
@@ -49,6 +53,19 @@ const App: React.FC = () => {
 
   useEffect(() => {
     init();
+
+    // Deep link handling logic (Simulated for Web, but matches Expo logic)
+    const handleUrl = async (url: string) => {
+      const { data, error } = await supabase.auth.getSession();
+      if (data?.session) {
+        // Session handled by onAuthStateChange in useStore
+      }
+    };
+
+    // Web-based simulated link check
+    if (window.location.hash || window.location.search) {
+       handleUrl(window.location.href);
+    }
   }, []);
 
   useEffect(() => {
@@ -59,8 +76,8 @@ const App: React.FC = () => {
         setVaultVibe(vibe);
       }
     };
-    fetchVibe();
-  }, [watchlists]);
+    if (session) fetchVibe();
+  }, [watchlists, session]);
 
   const handleAdd = async (listId: string) => {
     if (showAddSheet) {
@@ -95,6 +112,19 @@ const App: React.FC = () => {
       setViewingWatchlist(null);
     }
   };
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-[#14181c] flex flex-col items-center justify-center">
+        <div className="w-12 h-12 border-4 border-[#00e054] border-t-transparent rounded-full animate-spin mb-6" />
+        <p className="text-white/20 text-[10px] font-black uppercase tracking-[0.4em]">Vault Access Request</p>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <AuthScreen />;
+  }
 
   const filteredMovies = trendingMovies.filter(m => {
     if (filter === 'all') return true;
@@ -452,7 +482,10 @@ const App: React.FC = () => {
               Account Settings
               <div className="text-white/20">{ICONS.ChevronRight}</div>
             </button>
-            <button className="w-full p-5 rounded-2xl bg-red-500/10 text-red-500 text-sm font-bold">
+            <button 
+              onClick={() => useStore.getState().signOut()}
+              className="w-full p-5 rounded-2xl bg-red-500/10 text-red-500 text-sm font-bold active:scale-[0.98] transition-all"
+            >
               Sign Out
             </button>
           </div>

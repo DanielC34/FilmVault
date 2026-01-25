@@ -46,9 +46,11 @@ export interface Toast {
 
 export interface AppState {
   user: Profile | null;
+  session: any | null; // Supabase Session
+  isAuthLoading: boolean;
   watchlists: Watchlist[];
   activeWatchlistItems: WatchlistItem[];
-  favoriteIds: Set<string>; // For quick lookup of favorited movies
+  favoriteIds: Set<string>;
   isLoading: boolean;
   searchQuery: string;
   searchResults: Movie[];

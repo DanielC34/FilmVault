@@ -1,10 +1,19 @@
 
 import { Watchlist, WatchlistItem, Profile, MediaType } from '../types';
 
-const MOCK_USER: Profile = {
-  id: 'user_123',
-  username: 'cinephile_99',
-  avatar_url: 'https://picsum.photos/id/64/200/200',
+const STORAGE_KEY = 'fv_mock_users';
+
+const getMockUsers = (): Profile[] => {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  return saved ? JSON.parse(saved) : [{
+    id: 'user_123',
+    username: 'cinephile_99',
+    avatar_url: 'https://picsum.photos/id/64/200/200',
+  }];
+};
+
+const saveMockUsers = (users: Profile[]) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
 };
 
 let mockWatchlists: Watchlist[] = [
@@ -40,7 +49,23 @@ let mockItems: WatchlistItem[] = [
 ];
 
 export const supabaseMock = {
-  getProfile: async () => MOCK_USER,
+  getProfile: async (userId?: string) => {
+    const users = getMockUsers();
+    return users.find(u => u.id === userId) || users[0];
+  },
+
+  register: async (email: string) => {
+    const users = getMockUsers();
+    const username = email.split('@')[0];
+    const newUser: Profile = {
+      id: `user_${Math.random().toString(36).substr(2, 9)}`,
+      username: username,
+      avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+    };
+    users.push(newUser);
+    saveMockUsers(users);
+    return newUser;
+  },
   
   getWatchlists: async () => {
     return [...mockWatchlists];
@@ -53,9 +78,10 @@ export const supabaseMock = {
   },
 
   createWatchlist: async (title: string, description: string) => {
+    const users = getMockUsers();
     const newList: Watchlist = {
       id: `wl_${Math.random().toString(36).substr(2, 9)}`,
-      user_id: MOCK_USER.id,
+      user_id: users[0].id,
       title,
       description,
       created_at: new Date().toISOString(),
@@ -79,7 +105,6 @@ export const supabaseMock = {
   },
 
   addItemToWatchlist: async (watchlistId: string, movie: any) => {
-    // Check if already in this specific list
     const exists = mockItems.find(i => i.watchlist_id === watchlistId && i.media_id === String(movie.id));
     if (exists) return exists;
 
