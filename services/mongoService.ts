@@ -87,4 +87,12 @@ export const mongoService = {
     });
     return (await res.json()).is_watched;
   },
+
+  getUserProfile: async () => {
+    const res = await fetch(`${API_URL}/users/me`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch user profile');
+    return res.json();
+  },
 };

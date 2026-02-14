@@ -13,6 +13,8 @@ const normalizeResult = (item: any): Movie => ({
   release_date: item.release_date || item.first_air_date || '',
   vote_average: item.vote_average || 0,
   media_type: item.media_type || (item.title ? 'movie' : 'tv'),
+  genres: item.genres?.map((g: any) => g.name) || [],
+  runtime: item.runtime || item.episode_run_time?.[0] || undefined,
 });
 
 export const tmdbService = {

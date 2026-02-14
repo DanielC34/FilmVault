@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import watchlistRoutes from './routes/watchlists.js';
+import userRoutes from './routes/users.js';
 
 dotenv.config({ path: '../.env' });
 
@@ -18,6 +19,7 @@ mongoose.connect(process.env.MONGODB_URI)
 
 app.use('/api/auth', authRoutes);
 app.use('/api/watchlists', watchlistRoutes);
+app.use('/api/users', userRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });

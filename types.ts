@@ -10,12 +10,19 @@ export interface Movie {
   release_date: string;
   vote_average: number;
   media_type: MediaType;
+  genres?: string[];
+  runtime?: number;
 }
 
 export interface Profile {
   id: string;
   username: string;
+  email: string;
   avatar_url: string | null;
+  createdAt: string;
+  watchlistsCount: number;
+  totalItems: number;
+  watchedItems: number;
 }
 
 export interface Watchlist {

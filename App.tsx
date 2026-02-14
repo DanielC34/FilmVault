@@ -598,14 +598,14 @@ const App: React.FC = () => {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-[#1a2128] p-6 rounded-3xl border border-white/5">
-              <span className="text-3xl font-black text-white">124</span>
+              <span className="text-3xl font-black text-white">{user.watchedItems}</span>
               <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mt-1">
                 Movies Seen
               </p>
             </div>
             <div className="bg-[#1a2128] p-6 rounded-3xl border border-white/5">
               <span className="text-3xl font-black text-white">
-                {watchlists.length}
+                {user.watchlistsCount}
               </span>
               <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mt-1">
                 Active Vaults

@@ -76,24 +76,33 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
 
   loadUserData: async () => {
     set({ isLoading: true });
-    const watchlists = await mongoService.getWatchlists();
-    const favList = watchlists.find(
-      (w) => w.is_system_list && w.title === "Favorites",
-    );
-    let favorites = new Set<string>();
-    if (favList) {
-      const items = await mongoService.getWatchlistItems(favList.id);
-      favorites = new Set(items.map((i) => i.media_id));
+    try {
+      const [user, watchlists] = await Promise.all([
+        mongoService.getUserProfile(),
+        mongoService.getWatchlists()
+      ]);
+      
+      const favList = watchlists.find(
+        (w) => w.is_system_list && w.title === "Favorites",
+      );
+      let favorites = new Set<string>();
+      if (favList) {
+        const items = await mongoService.getWatchlistItems(favList.id);
+        favorites = new Set(items.map((i) => i.media_id));
+      }
+      const trending = await tmdbService.getTrending(1);
+      
+      set({
+        user,
+        watchlists,
+        favoriteIds: favorites,
+        trendingMovies: trending,
+        isLoading: false,
+      });
+    } catch (error) {
+      console.error('Failed to load user data:', error);
+      set({ isLoading: false });
     }
-    const trending = await tmdbService.getTrending(1);
-    const user = { id: "user", username: "cinephile", avatar_url: "" };
-    set({
-      user,
-      watchlists,
-      favoriteIds: favorites,
-      trendingMovies: trending,
-      isLoading: false,
-    });
   },
 
   signInAsGuest: async () => {
