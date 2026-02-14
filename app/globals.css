@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: "Inter", sans-serif;
+  background-color: #14181c;
+  color: #ffffff;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Custom scrollbar for cinema feel */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #14181c;
+}
+::-webkit-scrollbar-thumb {
+  background: #2c343c;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #404b57;
+}
+
+/* Specific custom scrollbar class for inner containers */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes toast-progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+.animate-toast-progress {
+  animation: toast-progress 3s linear forwards;
+}

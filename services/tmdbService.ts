@@ -1,7 +1,7 @@
 
 import { Movie, MediaType } from '../types';
 
-const API_KEY = import.meta.env.TMDB_API_KEY || 'f08f416251b2a32f3116e9be8cdd306a';
+const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY || 'f08f416251b2a32f3116e9be8cdd306a';
 const BASE_URL = 'https://api.themoviedb.org/3';
 
 const normalizeResult = (item: any): Movie => ({
