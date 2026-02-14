@@ -43,6 +43,10 @@ export interface Toast {
   id: string;
   message: string;
   type: 'success' | 'error' | 'info';
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 export interface AppState {
@@ -61,4 +65,9 @@ export interface AppState {
   totalTrendingPages: number;
   searchPage: number;
   totalSearchPages: number;
+  pendingDelete: {
+    item: WatchlistItem;
+    watchlistId: string;
+    timerId: NodeJS.Timeout;
+  } | null;
 }

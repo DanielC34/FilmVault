@@ -16,7 +16,8 @@ import {
   Sparkles,
   X,
   Check,
-  Eye
+  Eye,
+  AlertTriangle
 } from 'lucide-react';
 
 export const THEME = {
@@ -48,5 +49,6 @@ export const ICONS = {
   Sparkles: <Sparkles size={16} />,
   X: <X size={16} />,
   Check: <Check size={16} />,
-  Eye: <Eye size={16} />
+  Eye: <Eye size={16} />,
+  AlertTriangle: <AlertTriangle size={24} />
 };

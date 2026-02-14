@@ -5,6 +5,7 @@ import MovieCard from "./components/MovieCard";
 import MovieDetailModal from "./components/MovieDetailModal";
 import AddToWatchlistSheet from "./components/AddToWatchlistSheet";
 import CreateWatchlistModal from "./components/CreateWatchlistModal";
+import ConfirmationModal from "./components/ConfirmationModal";
 import ToastNotification from "./components/ToastNotification";
 import Pagination from "./components/Pagination";
 import AuthScreen from "./components/AuthScreen";
@@ -59,6 +60,12 @@ const App: React.FC = () => {
   const [isCreatingVault, setIsCreatingVault] = useState(false);
   const [filter, setFilter] = useState<"all" | "movies" | "tv">("all");
   const [vaultVibe, setVaultVibe] = useState<string>("");
+  const [confirmDelete, setConfirmDelete] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: "", description: "", onConfirm: () => {} });
 
   useEffect(() => {
     init();
@@ -103,14 +110,16 @@ const App: React.FC = () => {
       alert("System vaults cannot be deleted.");
       return;
     }
-    if (
-      window.confirm(
-        "Are you sure you want to delete this vault? All saved items will be lost.",
-      )
-    ) {
-      await deleteWatchlist(id);
-      setViewingWatchlist(null);
-    }
+    setConfirmDelete({
+      isOpen: true,
+      title: "Delete vault?",
+      description: "All saved items will be lost. This action cannot be undone.",
+      onConfirm: async () => {
+        await deleteWatchlist(id);
+        setViewingWatchlist(null);
+        setConfirmDelete({ isOpen: false, title: "", description: "", onConfirm: () => {} });
+      }
+    });
   };
 
   if (isAuthLoading) {
@@ -452,13 +461,7 @@ const App: React.FC = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (
-                              window.confirm(
-                                `Remove "${item.title}" from this vault?`,
-                              )
-                            ) {
-                              removeFromWatchlist(item.id);
-                            }
+                            removeFromWatchlist(item.id);
                           }}
                           className="p-1.5 bg-[#14181c] text-red-500 rounded-full border border-red-500/20 shadow-xl hover:bg-red-500 hover:text-white"
                           title="Remove from vault"
@@ -657,6 +660,14 @@ const App: React.FC = () => {
           onSave={handleCreateVault}
         />
       )}
+
+      <ConfirmationModal
+        isOpen={confirmDelete.isOpen}
+        title={confirmDelete.title}
+        description={confirmDelete.description}
+        onConfirm={confirmDelete.onConfirm}
+        onCancel={() => setConfirmDelete({ isOpen: false, title: "", description: "", onConfirm: () => {} })}
+      />
     </Layout>
   );
 };

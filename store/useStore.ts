@@ -31,8 +31,9 @@ interface AppActions {
   removeFromWatchlist: (itemId: string) => Promise<void>;
   deleteWatchlist: (id: string) => Promise<void>;
   fetchWatchlistItems: (watchlistId: string) => Promise<void>;
-  showToast: (message: string, type?: Toast["type"]) => void;
+  showToast: (message: string, type?: Toast["type"], action?: Toast["action"]) => void;
   hideToast: () => void;
+  undoDelete: () => void;
 }
 
 export const useStore = create<AppState & AppActions>((set, get) => ({
@@ -51,6 +52,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   searchPage: 1,
   totalSearchPages: 1,
   toast: null,
+  pendingDelete: null,
 
   init: async () => {
     const token = localStorage.getItem("fv_token");
@@ -136,14 +138,14 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
     get().showToast("Logged out of the vault.");
   },
 
-  showToast: (message: string, type: Toast["type"] = "success") => {
+  showToast: (message: string, type: Toast["type"] = "success", action?: Toast["action"]) => {
     const id = Math.random().toString(36).substring(7);
-    set({ toast: { id, message, type } });
+    set({ toast: { id, message, type, action } });
     setTimeout(() => {
       if (get().toast?.id === id) {
         set({ toast: null });
       }
-    }, 3000);
+    }, action ? 6000 : 3000); // Longer duration for undo toasts
   },
 
   hideToast: () => set({ toast: null }),
@@ -268,19 +270,75 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   },
 
   removeFromWatchlist: async (itemId: string) => {
-    try {
-      const item = get().activeWatchlistItems.find((i) => i.id === itemId);
-      await mongoService.removeItemFromWatchlist(itemId);
-      const currentItems = get().activeWatchlistItems;
-      set({
-        activeWatchlistItems: currentItems.filter((i) => i.id !== itemId),
-      });
-      const watchlists = await mongoService.getWatchlists();
-      set({ watchlists });
-      get().showToast(`"${item?.title || "Item"}" removed from vault.`);
-    } catch (error) {
-      get().showToast("Failed to remove item.", "error");
+    const item = get().activeWatchlistItems.find((i) => i.id === itemId);
+    if (!item) return;
+
+    // Clear any existing pending delete
+    const { pendingDelete } = get();
+    if (pendingDelete) {
+      clearTimeout(pendingDelete.timerId);
     }
+
+    // Optimistically remove from UI
+    const currentItems = get().activeWatchlistItems;
+    const itemIndex = currentItems.findIndex((i) => i.id === itemId);
+    set({
+      activeWatchlistItems: currentItems.filter((i) => i.id !== itemId),
+    });
+
+    // Set up undo timer
+    const timerId = setTimeout(async () => {
+      try {
+        await mongoService.removeItemFromWatchlist(itemId);
+        const watchlists = await mongoService.getWatchlists();
+        set({ watchlists, pendingDelete: null });
+      } catch (error) {
+        // Restore item on error
+        const restoredItems = [...get().activeWatchlistItems];
+        restoredItems.splice(itemIndex, 0, item);
+        set({ activeWatchlistItems: restoredItems, pendingDelete: null });
+        get().showToast("Failed to remove item.", "error");
+      }
+    }, 6000);
+
+    // Store pending delete state
+    set({
+      pendingDelete: {
+        item,
+        watchlistId: item.watchlist_id,
+        timerId,
+      },
+    });
+
+    // Show undo toast
+    get().showToast(
+      `"${item.title}" removed from vault.`,
+      "info",
+      {
+        label: "Undo",
+        onClick: () => get().undoDelete(),
+      }
+    );
+  },
+
+  undoDelete: () => {
+    const { pendingDelete } = get();
+    if (!pendingDelete) return;
+
+    // Cancel the timer
+    clearTimeout(pendingDelete.timerId);
+
+    // Restore item to original position
+    const currentItems = get().activeWatchlistItems;
+    const restoredItems = [...currentItems, pendingDelete.item];
+    
+    set({
+      activeWatchlistItems: restoredItems,
+      pendingDelete: null,
+      toast: null, // Hide the undo toast
+    });
+
+    get().showToast(`"${pendingDelete.item.title}" restored.`);
   },
 
   deleteWatchlist: async (id: string) => {

@@ -32,12 +32,22 @@ const ToastNotification: React.FC<ToastNotificationProps> = ({ toast, onClose })
         <div className="flex-shrink-0">
           {getIcon()}
         </div>
-        <p className="text-sm font-bold text-white pr-6 leading-tight">
-          {toast.message}
-        </p>
+        <div className="flex-1 pr-6">
+          <p className="text-sm font-bold text-white leading-tight">
+            {toast.message}
+          </p>
+          {toast.action && (
+            <button
+              onClick={toast.action.onClick}
+              className="mt-2 px-3 py-1 bg-[#00e054] text-black text-xs font-black rounded-lg hover:bg-[#00e054]/80 transition-colors uppercase tracking-wider"
+            >
+              {toast.action.label}
+            </button>
+          )}
+        </div>
         <button 
           onClick={onClose}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white transition-colors"
+          className="absolute right-3 top-3 text-white/20 hover:text-white transition-colors"
         >
           <X size={16} />
         </button>
