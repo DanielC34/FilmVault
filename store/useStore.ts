@@ -1,8 +1,14 @@
-
-import { create } from 'zustand';
-import { AppState, Profile, Watchlist, WatchlistItem, Movie, Toast } from '../types';
-import { mongoService } from '../services/mongoService';
-import { tmdbService } from '../services/tmdbService';
+import { create } from "zustand";
+import {
+  AppState,
+  Profile,
+  Watchlist,
+  WatchlistItem,
+  Movie,
+  Toast,
+} from "../types";
+import { mongoService } from "../services/mongoService";
+import { tmdbService } from "../services/tmdbService";
 
 interface AppActions {
   init: () => Promise<void>;
@@ -15,14 +21,17 @@ interface AppActions {
   setSearchQuery: (query: string) => void;
   setSearchPage: (page: number) => Promise<void>;
   setTrendingPage: (page: number) => Promise<void>;
-  createWatchlist: (title: string, description: string) => Promise<Watchlist | undefined>;
+  createWatchlist: (
+    title: string,
+    description: string,
+  ) => Promise<Watchlist | undefined>;
   addToWatchlist: (watchlistId: string, movie: Movie) => Promise<void>;
   toggleFavorite: (movie: Movie) => Promise<void>;
   toggleWatchedStatus: (itemId: string) => Promise<void>;
   removeFromWatchlist: (itemId: string) => Promise<void>;
   deleteWatchlist: (id: string) => Promise<void>;
   fetchWatchlistItems: (watchlistId: string) => Promise<void>;
-  showToast: (message: string, type?: Toast['type']) => void;
+  showToast: (message: string, type?: Toast["type"]) => void;
   hideToast: () => void;
 }
 
@@ -34,7 +43,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   activeWatchlistItems: [],
   favoriteIds: new Set(),
   isLoading: false,
-  searchQuery: '',
+  searchQuery: "",
   searchResults: [],
   trendingMovies: [],
   trendingPage: 1,
@@ -44,11 +53,20 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   toast: null,
 
   init: async () => {
-    set({ isAuthLoading: true });
-    const token = localStorage.getItem('fv_token');
+    const token = localStorage.getItem("fv_token");
+
     if (token) {
-      await get().loadUserData();
-      set({ session: { user: { id: 'user' }, access_token: token }, isAuthLoading: false });
+      set({
+        session: { user: { id: "user" }, access_token: token },
+        isAuthLoading: false,
+      });
+
+      try {
+        await get().loadUserData();
+      } catch (error) {
+        console.error("Failed to load user data", error);
+        // DO NOT remove token here
+      }
     } else {
       set({ isAuthLoading: false });
     }
@@ -56,20 +74,24 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
 
   loadUserData: async () => {
     set({ isLoading: true });
-    try {
-      const watchlists = await mongoService.getWatchlists();
-      const favList = watchlists.find(w => w.is_system_list && w.title === 'Favorites');
-      let favorites = new Set<string>();
-      if (favList) {
-        const items = await mongoService.getWatchlistItems(favList.id);
-        favorites = new Set(items.map(i => i.media_id));
-      }
-      const trending = await tmdbService.getTrending(1);
-      const user = { id: 'user', username: 'cinephile', avatar_url: '' };
-      set({ user, watchlists, favoriteIds: favorites, trendingMovies: trending, isLoading: false });
-    } catch (e) {
-      set({ isLoading: false });
+    const watchlists = await mongoService.getWatchlists();
+    const favList = watchlists.find(
+      (w) => w.is_system_list && w.title === "Favorites",
+    );
+    let favorites = new Set<string>();
+    if (favList) {
+      const items = await mongoService.getWatchlistItems(favList.id);
+      favorites = new Set(items.map((i) => i.media_id));
     }
+    const trending = await tmdbService.getTrending(1);
+    const user = { id: "user", username: "cinephile", avatar_url: "" };
+    set({
+      user,
+      watchlists,
+      favoriteIds: favorites,
+      trendingMovies: trending,
+      isLoading: false,
+    });
   },
 
   signInAsGuest: async () => {
@@ -79,7 +101,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   signInWithPassword: async (email, password) => {
     try {
       const { token, user } = await mongoService.signIn(email, password);
-      localStorage.setItem('fv_token', token);
+      localStorage.setItem("fv_token", token);
       set({ session: { user: { id: user.id }, access_token: token }, user });
       await get().loadUserData();
       get().showToast("Access granted. Welcome back.");
@@ -93,7 +115,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   signUpWithEmail: async (email, password) => {
     try {
       const { token, user } = await mongoService.signUp(email, password);
-      localStorage.setItem('fv_token', token);
+      localStorage.setItem("fv_token", token);
       set({ session: { user: { id: user.id }, access_token: token }, user });
       await get().loadUserData();
       get().showToast("Vault initialized. Welcome.");
@@ -109,12 +131,12 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   },
 
   signOut: async () => {
-    localStorage.removeItem('fv_token');
+    localStorage.removeItem("fv_token");
     set({ session: null, user: null });
     get().showToast("Logged out of the vault.");
   },
 
-  showToast: (message: string, type: Toast['type'] = 'success') => {
+  showToast: (message: string, type: Toast["type"] = "success") => {
     const id = Math.random().toString(36).substring(7);
     set({ toast: { id, message, type } });
     setTimeout(() => {
@@ -148,7 +170,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
     try {
       const results = await tmdbService.search(searchQuery, page);
       set({ searchResults: results, isLoading: false });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       set({ isLoading: false });
     }
@@ -159,7 +181,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
     try {
       const trending = await tmdbService.getTrending(page);
       set({ trendingMovies: trending, isLoading: false });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       set({ isLoading: false });
     }
@@ -167,7 +189,9 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
 
   toggleFavorite: async (movie: Movie) => {
     const { favoriteIds, watchlists } = get();
-    const favList = watchlists.find(w => w.is_system_list && w.title === 'Favorites');
+    const favList = watchlists.find(
+      (w) => w.is_system_list && w.title === "Favorites",
+    );
     if (!favList) return;
     const isFav = favoriteIds.has(String(movie.id));
     const newFavs = new Set(favoriteIds);
@@ -177,7 +201,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
     try {
       if (isFav) {
         const items = await mongoService.getWatchlistItems(favList.id);
-        const item = items.find(i => i.media_id === String(movie.id));
+        const item = items.find((i) => i.media_id === String(movie.id));
         if (item) await mongoService.removeItemFromWatchlist(item.id);
         get().showToast(`Removed from Favorites.`);
       } else {
@@ -188,20 +212,22 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
       set({ watchlists: updatedWatchlists });
     } catch (error) {
       set({ favoriteIds });
-      get().showToast('Failed to update favorites.', 'error');
+      get().showToast("Failed to update favorites.", "error");
     }
   },
 
   toggleWatchedStatus: async (itemId: string) => {
     try {
       const result = await mongoService.toggleWatchedStatus(itemId);
-      const items = get().activeWatchlistItems.map(item => 
-        item.id === itemId ? { ...item, is_watched: result } : item
+      const items = get().activeWatchlistItems.map((item) =>
+        item.id === itemId ? { ...item, is_watched: result } : item,
       );
       set({ activeWatchlistItems: items });
       const watchlists = await mongoService.getWatchlists();
       set({ watchlists });
-      get().showToast(result ? "Archived in history." : "Returned to watchlist.");
+      get().showToast(
+        result ? "Archived in history." : "Returned to watchlist.",
+      );
     } catch (error) {
       get().showToast("Failed to update status.", "error");
     }
@@ -210,11 +236,11 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   createWatchlist: async (title: string, description: string) => {
     try {
       const newList = await mongoService.createWatchlist(title, description);
-      set(state => ({ watchlists: [...state.watchlists, newList] }));
+      set((state) => ({ watchlists: [...state.watchlists, newList] }));
       get().showToast(`Vault "${title}" created successfully.`);
       return newList;
     } catch (error) {
-      get().showToast('Failed to create vault.', 'error');
+      get().showToast("Failed to create vault.", "error");
       return undefined;
     }
   },
@@ -224,10 +250,10 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
       await mongoService.addItemToWatchlist(watchlistId, movie);
       const watchlists = await mongoService.getWatchlists();
       set({ watchlists });
-      const list = watchlists.find(w => w.id === watchlistId);
-      get().showToast(`"${movie.title}" added to ${list?.title || 'vault'}.`);
+      const list = watchlists.find((w) => w.id === watchlistId);
+      get().showToast(`"${movie.title}" added to ${list?.title || "vault"}.`);
     } catch (error) {
-      get().showToast('Failed to add movie.', 'error');
+      get().showToast("Failed to add movie.", "error");
     }
   },
 
@@ -243,27 +269,31 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
 
   removeFromWatchlist: async (itemId: string) => {
     try {
-      const item = get().activeWatchlistItems.find(i => i.id === itemId);
+      const item = get().activeWatchlistItems.find((i) => i.id === itemId);
       await mongoService.removeItemFromWatchlist(itemId);
       const currentItems = get().activeWatchlistItems;
-      set({ activeWatchlistItems: currentItems.filter(i => i.id !== itemId) });
+      set({
+        activeWatchlistItems: currentItems.filter((i) => i.id !== itemId),
+      });
       const watchlists = await mongoService.getWatchlists();
       set({ watchlists });
-      get().showToast(`"${item?.title || 'Item'}" removed from vault.`);
+      get().showToast(`"${item?.title || "Item"}" removed from vault.`);
     } catch (error) {
-      get().showToast('Failed to remove item.', 'error');
+      get().showToast("Failed to remove item.", "error");
     }
   },
 
   deleteWatchlist: async (id: string) => {
     try {
-      const list = get().watchlists.find(w => w.id === id);
+      const list = get().watchlists.find((w) => w.id === id);
       if (list?.is_system_list) return;
       await mongoService.deleteWatchlist(id);
-      set(state => ({ watchlists: state.watchlists.filter(w => w.id !== id) }));
-      get().showToast(`Vault "${list?.title || 'Archive'}" deleted.`);
+      set((state) => ({
+        watchlists: state.watchlists.filter((w) => w.id !== id),
+      }));
+      get().showToast(`Vault "${list?.title || "Archive"}" deleted.`);
     } catch (error) {
-      get().showToast('Failed to delete vault.', 'error');
+      get().showToast("Failed to delete vault.", "error");
     }
-  }
+  },
 }));
