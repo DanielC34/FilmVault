@@ -1,5 +1,4 @@
-
-export type MediaType = 'movie' | 'tv';
+export type MediaType = "movie" | "tv";
 
 export interface Movie {
   id: string;
@@ -10,19 +9,12 @@ export interface Movie {
   release_date: string;
   vote_average: number;
   media_type: MediaType;
-  genres?: string[];
-  runtime?: number;
 }
 
 export interface Profile {
   id: string;
   username: string;
-  email: string;
   avatar_url: string | null;
-  createdAt: string;
-  watchlistsCount: number;
-  totalItems: number;
-  watchedItems: number;
 }
 
 export interface Watchlist {
@@ -49,16 +41,12 @@ export interface WatchlistItem {
 export interface Toast {
   id: string;
   message: string;
-  type: 'success' | 'error' | 'info';
-  action?: {
-    label: string;
-    onClick: () => void;
-  };
+  type: "success" | "error" | "info";
 }
 
 export interface AppState {
   user: Profile | null;
-  session: any | null; // Supabase Session
+  session: any | null;
   isAuthLoading: boolean;
   watchlists: Watchlist[];
   activeWatchlistItems: WatchlistItem[];
@@ -72,9 +60,4 @@ export interface AppState {
   totalTrendingPages: number;
   searchPage: number;
   totalSearchPages: number;
-  pendingDelete: {
-    item: WatchlistItem;
-    watchlistId: string;
-    timerId: NodeJS.Timeout;
-  } | null;
 }

@@ -8,6 +8,15 @@ import { MovieDetailSkeleton } from './Skeletons';
 import FavoriteButton from './FavoriteButton';
 import { useStore } from '../store/useStore';
 
+const formatRuntime = (minutes: number): string => {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours > 0) {
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  }
+  return `${mins}m`;
+};
+
 interface MovieDetailModalProps {
   movie: Movie;
   onClose: () => void;
@@ -91,15 +100,26 @@ const MovieDetailModal: React.FC<MovieDetailModalProps> = ({ movie, onClose, onA
               </div>
               <div className="flex-1 pb-2 text-left">
                 <h1 className="text-3xl font-black text-white leading-tight mb-1">{fullMovie.title}</h1>
-                <div className="flex items-center gap-3 text-white/60 text-xs font-bold uppercase tracking-widest">
+                <div className="flex items-center gap-3 text-white/60 text-xs font-bold uppercase tracking-widest mb-2">
                   <span>{fullMovie.release_date ? new Date(fullMovie.release_date).getFullYear() : 'TBA'}</span>
                   <span>•</span>
                   <div className="flex items-center gap-1 text-[#ff8000]">
                     {ICONS.Star}
                     <span>{fullMovie.vote_average ? fullMovie.vote_average.toFixed(1) : 'NR'}</span>
                   </div>
+                  {fullMovie.runtime && (
+                    <>
+                      <span>•</span>
+                      <span>{formatRuntime(fullMovie.runtime)}</span>
+                    </>
+                  )}
                   <span className="bg-white/10 px-1.5 py-0.5 rounded text-[8px]">{fullMovie.media_type.toUpperCase()}</span>
                 </div>
+                {fullMovie.genres && fullMovie.genres.length > 0 && (
+                  <p className="text-white/50 text-xs font-medium">
+                    {fullMovie.genres.join(' • ')}
+                  </p>
+                )}
               </div>
             </div>
 

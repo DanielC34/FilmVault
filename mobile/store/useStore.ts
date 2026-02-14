@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   AppState,
   Profile,
@@ -7,8 +8,9 @@ import {
   Movie,
   Toast,
 } from "../types";
-import { mongoService } from "../services/mongoService";
+import { supabaseMock } from "../services/supabaseMock";
 import { tmdbService } from "../services/tmdbService";
+import { supabase, isSupabaseConfigured } from "../services/supabaseClient";
 
 interface AppActions {
   init: () => Promise<void>;
@@ -23,7 +25,7 @@ interface AppActions {
   setTrendingPage: (page: number) => Promise<void>;
   createWatchlist: (
     title: string,
-    description: string,
+    description: string
   ) => Promise<Watchlist | undefined>;
   addToWatchlist: (watchlistId: string, movie: Movie) => Promise<void>;
   toggleFavorite: (movie: Movie) => Promise<void>;
@@ -31,9 +33,8 @@ interface AppActions {
   removeFromWatchlist: (itemId: string) => Promise<void>;
   deleteWatchlist: (id: string) => Promise<void>;
   fetchWatchlistItems: (watchlistId: string) => Promise<void>;
-  showToast: (message: string, type?: Toast["type"], action?: Toast["action"]) => void;
+  showToast: (message: string, type?: Toast["type"]) => void;
   hideToast: () => void;
-  undoDelete: () => void;
 }
 
 export const useStore = create<AppState & AppActions>((set, get) => ({
@@ -52,24 +53,38 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   searchPage: 1,
   totalSearchPages: 1,
   toast: null,
-  pendingDelete: null,
 
   init: async () => {
-    const token = localStorage.getItem("fv_token");
+    set({ isAuthLoading: true });
 
-    if (token) {
-      set({
-        session: { user: { id: "user" }, access_token: token },
-        isAuthLoading: false,
-      });
+    const mockSession = await AsyncStorage.getItem("fv_mock_session");
 
-      try {
-        await get().loadUserData();
-      } catch (error) {
-        console.error("Failed to load user data", error);
-        // DO NOT remove token here
+    if (mockSession) {
+      const session = JSON.parse(mockSession);
+      set({ session, isAuthLoading: false });
+      await get().loadUserData();
+      return;
+    }
+
+    try {
+      if (isSupabaseConfigured()) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        supabase.auth.onAuthStateChange((_event, session) => {
+          set({ session });
+          if (session) get().loadUserData();
+        });
+
+        if (session) {
+          set({ session });
+          await get().loadUserData();
+        }
       }
-    } else {
+    } catch (e) {
+      console.warn("Supabase connection failed. Falling back to Auth UI.", e);
+    } finally {
       set({ isAuthLoading: false });
     }
   },
@@ -77,21 +92,19 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   loadUserData: async () => {
     set({ isLoading: true });
     try {
-      const [user, watchlists] = await Promise.all([
-        mongoService.getUserProfile(),
-        mongoService.getWatchlists()
-      ]);
-      
+      const { session } = get();
+      const userId = session?.user?.id;
+      const user = await supabaseMock.getProfile(userId);
+      const watchlists = await supabaseMock.getWatchlists();
       const favList = watchlists.find(
-        (w) => w.is_system_list && w.title === "Favorites",
+        (w) => w.is_system_list && w.title === "Favorites"
       );
       let favorites = new Set<string>();
       if (favList) {
-        const items = await mongoService.getWatchlistItems(favList.id);
+        const items = await supabaseMock.getWatchlistItems(favList.id);
         favorites = new Set(items.map((i) => i.media_id));
       }
       const trending = await tmdbService.getTrending(1);
-      
       set({
         user,
         watchlists,
@@ -99,22 +112,49 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
         trendingMovies: trending,
         isLoading: false,
       });
-    } catch (error) {
-      console.error('Failed to load user data:', error);
+    } catch (e) {
+      console.error("Load user data error:", e);
       set({ isLoading: false });
     }
   },
 
   signInAsGuest: async () => {
-    get().showToast("Guest mode not available. Please sign up.", "info");
+    set({ isAuthLoading: true });
+    const fakeSession = {
+      user: { id: "user_123", email: "guest@filmvault.app" },
+      access_token: "mock_token",
+    };
+    await AsyncStorage.setItem("fv_mock_session", JSON.stringify(fakeSession));
+    set({ session: fakeSession });
+    await get().loadUserData();
+    set({ isAuthLoading: false });
+    get().showToast("Entered Vault in Developer Guest Mode.", "info");
   },
 
   signInWithPassword: async (email, password) => {
-    try {
-      const { token, user } = await mongoService.signIn(email, password);
-      localStorage.setItem("fv_token", token);
-      set({ session: { user: { id: user.id }, access_token: token }, user });
+    if (!isSupabaseConfigured()) {
+      set({ isAuthLoading: true });
+      const fakeSession = {
+        user: { id: `user_${Math.random().toString(36).substr(2, 9)}`, email },
+        access_token: "mock_token",
+      };
+      await AsyncStorage.setItem(
+        "fv_mock_session",
+        JSON.stringify(fakeSession)
+      );
+      set({ session: fakeSession });
       await get().loadUserData();
+      set({ isAuthLoading: false });
+      get().showToast("Access granted (Mock Mode).");
+      return true;
+    }
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+      set({ session: data.session });
       get().showToast("Access granted. Welcome back.");
       return true;
     } catch (error: any) {
@@ -124,12 +164,32 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   },
 
   signUpWithEmail: async (email, password) => {
-    try {
-      const { token, user } = await mongoService.signUp(email, password);
-      localStorage.setItem("fv_token", token);
-      set({ session: { user: { id: user.id }, access_token: token }, user });
+    if (!isSupabaseConfigured()) {
+      set({ isAuthLoading: true });
+      const newUser = await supabaseMock.register(email);
+      const fakeSession = {
+        user: { id: newUser.id, email },
+        access_token: "mock_token",
+      };
+      await AsyncStorage.setItem(
+        "fv_mock_session",
+        JSON.stringify(fakeSession)
+      );
+      set({ session: fakeSession });
       await get().loadUserData();
-      get().showToast("Vault initialized. Welcome.");
+      set({ isAuthLoading: false });
+      get().showToast("Vault initialized (Mock Mode).");
+      return true;
+    }
+    try {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) throw error;
+      if (data.session) {
+        set({ session: data.session });
+        get().showToast("Vault initialized. Welcome.");
+      } else {
+        get().showToast("Verification email dispatched.", "info");
+      }
       return true;
     } catch (error: any) {
       get().showToast(error.message, "error");
@@ -138,37 +198,54 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   },
 
   signInWithGoogle: async () => {
-    get().showToast("Google Auth not implemented yet.", "info");
+    if (!isSupabaseConfigured()) {
+      await get().signInAsGuest();
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      get().showToast("Google Auth failed. Using Guest Mode instead.", "info");
+      await get().signInAsGuest();
+    }
   },
 
   signOut: async () => {
-    localStorage.removeItem("fv_token");
+    await AsyncStorage.removeItem("fv_mock_session");
+    if (isSupabaseConfigured()) {
+      await supabase.auth.signOut();
+    }
     set({ session: null, user: null });
     get().showToast("Logged out of the vault.");
   },
 
-  showToast: (message: string, type: Toast["type"] = "success", action?: Toast["action"]) => {
+  showToast: (message: string, type: Toast["type"] = "success") => {
     const id = Math.random().toString(36).substring(7);
-    set({ toast: { id, message, type, action } });
+    set({ toast: { id, message, type } });
     setTimeout(() => {
       if (get().toast?.id === id) {
         set({ toast: null });
       }
-    }, action ? 6000 : 3000); // Longer duration for undo toasts
+    }, 3000);
   },
 
   hideToast: () => set({ toast: null }),
 
-  setSearchQuery: async (query: string) => {
+  setSearchQuery: (query: string) => {
     set({ searchQuery: query, searchPage: 1 });
     if (query.length > 2) {
       set({ isLoading: true });
-      try {
-        const results = await tmdbService.search(query, 1);
-        set({ searchResults: results, isLoading: false });
-      } catch (error) {
-        set({ searchResults: [], isLoading: false });
-      }
+      tmdbService
+        .search(query, 1)
+        .then((results) => {
+          set({ searchResults: results, isLoading: false });
+        })
+        .catch(() => {
+          set({ searchResults: [], isLoading: false });
+        });
     } else {
       set({ searchResults: [] });
     }
@@ -181,7 +258,6 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
     try {
       const results = await tmdbService.search(searchQuery, page);
       set({ searchResults: results, isLoading: false });
-      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       set({ isLoading: false });
     }
@@ -192,7 +268,6 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
     try {
       const trending = await tmdbService.getTrending(page);
       set({ trendingMovies: trending, isLoading: false });
-      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       set({ isLoading: false });
     }
@@ -201,7 +276,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   toggleFavorite: async (movie: Movie) => {
     const { favoriteIds, watchlists } = get();
     const favList = watchlists.find(
-      (w) => w.is_system_list && w.title === "Favorites",
+      (w) => w.is_system_list && w.title === "Favorites"
     );
     if (!favList) return;
     const isFav = favoriteIds.has(String(movie.id));
@@ -211,15 +286,16 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
     set({ favoriteIds: newFavs });
     try {
       if (isFav) {
-        const items = await mongoService.getWatchlistItems(favList.id);
-        const item = items.find((i) => i.media_id === String(movie.id));
-        if (item) await mongoService.removeItemFromWatchlist(item.id);
+        await supabaseMock.removeMovieFromWatchlist(
+          favList.id,
+          String(movie.id)
+        );
         get().showToast(`Removed from Favorites.`);
       } else {
-        await mongoService.addItemToWatchlist(favList.id, movie);
+        await supabaseMock.addItemToWatchlist(favList.id, movie);
         get().showToast(`Added to Favorites.`);
       }
-      const updatedWatchlists = await mongoService.getWatchlists();
+      const updatedWatchlists = await supabaseMock.getWatchlists();
       set({ watchlists: updatedWatchlists });
     } catch (error) {
       set({ favoriteIds });
@@ -229,15 +305,15 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
 
   toggleWatchedStatus: async (itemId: string) => {
     try {
-      const result = await mongoService.toggleWatchedStatus(itemId);
+      const result = await supabaseMock.toggleWatchedStatus(itemId);
       const items = get().activeWatchlistItems.map((item) =>
-        item.id === itemId ? { ...item, is_watched: result } : item,
+        item.id === itemId ? { ...item, is_watched: result } : item
       );
       set({ activeWatchlistItems: items });
-      const watchlists = await mongoService.getWatchlists();
+      const watchlists = await supabaseMock.getWatchlists();
       set({ watchlists });
       get().showToast(
-        result ? "Archived in history." : "Returned to watchlist.",
+        result ? "Archived in history." : "Returned to watchlist."
       );
     } catch (error) {
       get().showToast("Failed to update status.", "error");
@@ -246,7 +322,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
 
   createWatchlist: async (title: string, description: string) => {
     try {
-      const newList = await mongoService.createWatchlist(title, description);
+      const newList = await supabaseMock.createWatchlist(title, description);
       set((state) => ({ watchlists: [...state.watchlists, newList] }));
       get().showToast(`Vault "${title}" created successfully.`);
       return newList;
@@ -258,8 +334,8 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
 
   addToWatchlist: async (watchlistId: string, movie: Movie) => {
     try {
-      await mongoService.addItemToWatchlist(watchlistId, movie);
-      const watchlists = await mongoService.getWatchlists();
+      await supabaseMock.addItemToWatchlist(watchlistId, movie);
+      const watchlists = await supabaseMock.getWatchlists();
       set({ watchlists });
       const list = watchlists.find((w) => w.id === watchlistId);
       get().showToast(`"${movie.title}" added to ${list?.title || "vault"}.`);
@@ -271,7 +347,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   fetchWatchlistItems: async (watchlistId: string) => {
     set({ isLoading: true });
     try {
-      const items = await mongoService.getWatchlistItems(watchlistId);
+      const items = await supabaseMock.getWatchlistItems(watchlistId);
       set({ activeWatchlistItems: items, isLoading: false });
     } catch (error) {
       set({ isLoading: false });
@@ -279,82 +355,26 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   },
 
   removeFromWatchlist: async (itemId: string) => {
-    const item = get().activeWatchlistItems.find((i) => i.id === itemId);
-    if (!item) return;
-
-    // Clear any existing pending delete
-    const { pendingDelete } = get();
-    if (pendingDelete) {
-      clearTimeout(pendingDelete.timerId);
+    try {
+      const item = get().activeWatchlistItems.find((i) => i.id === itemId);
+      await supabaseMock.removeItemFromWatchlist(itemId);
+      const currentItems = get().activeWatchlistItems;
+      set({
+        activeWatchlistItems: currentItems.filter((i) => i.id !== itemId),
+      });
+      const watchlists = await supabaseMock.getWatchlists();
+      set({ watchlists });
+      get().showToast(`"${item?.title || "Item"}" removed from vault.`);
+    } catch (error) {
+      get().showToast("Failed to remove item.", "error");
     }
-
-    // Optimistically remove from UI
-    const currentItems = get().activeWatchlistItems;
-    const itemIndex = currentItems.findIndex((i) => i.id === itemId);
-    set({
-      activeWatchlistItems: currentItems.filter((i) => i.id !== itemId),
-    });
-
-    // Set up undo timer
-    const timerId = setTimeout(async () => {
-      try {
-        await mongoService.removeItemFromWatchlist(itemId);
-        const watchlists = await mongoService.getWatchlists();
-        set({ watchlists, pendingDelete: null });
-      } catch (error) {
-        // Restore item on error
-        const restoredItems = [...get().activeWatchlistItems];
-        restoredItems.splice(itemIndex, 0, item);
-        set({ activeWatchlistItems: restoredItems, pendingDelete: null });
-        get().showToast("Failed to remove item.", "error");
-      }
-    }, 6000);
-
-    // Store pending delete state
-    set({
-      pendingDelete: {
-        item,
-        watchlistId: item.watchlist_id,
-        timerId,
-      },
-    });
-
-    // Show undo toast
-    get().showToast(
-      `"${item.title}" removed from vault.`,
-      "info",
-      {
-        label: "Undo",
-        onClick: () => get().undoDelete(),
-      }
-    );
-  },
-
-  undoDelete: () => {
-    const { pendingDelete } = get();
-    if (!pendingDelete) return;
-
-    // Cancel the timer
-    clearTimeout(pendingDelete.timerId);
-
-    // Restore item to original position
-    const currentItems = get().activeWatchlistItems;
-    const restoredItems = [...currentItems, pendingDelete.item];
-    
-    set({
-      activeWatchlistItems: restoredItems,
-      pendingDelete: null,
-      toast: null, // Hide the undo toast
-    });
-
-    get().showToast(`"${pendingDelete.item.title}" restored.`);
   },
 
   deleteWatchlist: async (id: string) => {
     try {
       const list = get().watchlists.find((w) => w.id === id);
       if (list?.is_system_list) return;
-      await mongoService.deleteWatchlist(id);
+      await supabaseMock.deleteWatchlist(id);
       set((state) => ({
         watchlists: state.watchlists.filter((w) => w.id !== id),
       }));

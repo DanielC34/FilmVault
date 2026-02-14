@@ -1,7 +1,7 @@
 
 import { Movie, MediaType } from '../types';
 
-const API_KEY = 'f08f416251b2a32f3116e9be8cdd306a';
+const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY || 'f08f416251b2a32f3116e9be8cdd306a';
 const BASE_URL = 'https://api.themoviedb.org/3';
 
 const normalizeResult = (item: any): Movie => ({
@@ -13,6 +13,8 @@ const normalizeResult = (item: any): Movie => ({
   release_date: item.release_date || item.first_air_date || '',
   vote_average: item.vote_average || 0,
   media_type: item.media_type || (item.title ? 'movie' : 'tv'),
+  genres: item.genres?.map((g: any) => g.name) || [],
+  runtime: item.runtime || item.episode_run_time?.[0] || undefined,
 });
 
 export const tmdbService = {
