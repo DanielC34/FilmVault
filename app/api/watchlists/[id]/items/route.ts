@@ -1,18 +1,20 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { getUserId } from '@/lib/auth';
+import { getParam } from '@/lib/routeParams';
 import Watchlist from '@/lib/models/Watchlist.js';
 import WatchlistItem from '@/lib/models/WatchlistItem.js';
 
 export async function GET(
-    req: Request,
-    { params }: { params: { id: string } }
+    req: NextRequest,
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await getParam(context);
         getUserId(req); // Validate token
         await connectDB();
 
-        const items = await WatchlistItem.find({ watchlist_id: params.id });
+        const items = await WatchlistItem.find({ watchlist_id: id });
 
         return NextResponse.json(items.map(i => ({
             id: i._id,
@@ -31,23 +33,24 @@ export async function GET(
 }
 
 export async function POST(
-    req: Request,
-    { params }: { params: { id: string } }
+    req: NextRequest,
+    context: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await getParam(context);
         getUserId(req); // Validate token
         const { media_id, media_type, title, poster_path } = await req.json();
         await connectDB();
 
         const item = await WatchlistItem.create({
-            watchlist_id: params.id,
+            watchlist_id: id,
             media_id,
             media_type,
             title,
             poster_path
         });
 
-        await Watchlist.findByIdAndUpdate(params.id, { $inc: { item_count: 1 } });
+        await Watchlist.findByIdAndUpdate(id, { $inc: { item_count: 1 } });
 
         return NextResponse.json({
             id: item._id,
