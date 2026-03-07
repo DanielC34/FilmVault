@@ -1,30 +1,31 @@
 
-import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY });
-
 export const geminiService = {
-  getMovieInsight: async (movieTitle: string) => {
+  getMovieInsight: async (movieTitle: string): Promise<string> => {
     try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Provide a one-sentence "cinephile hot take" on why a movie fan must watch "${movieTitle}". Keep it professional but edgy, like a Criterion Collection essay snippet.`,
+      const res = await fetch('/api/ai/movie-insight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ movieTitle }),
       });
-      return response.text || "A modern masterpiece that defies convention.";
+      const data = await res.json();
+      return data.text || "An essential piece of cinematic history.";
     } catch (error) {
-      console.error("Gemini Error:", error);
+      console.error("Gemini insight fetch error:", error);
       return "An essential piece of cinematic history.";
     }
   },
-  
-  getWatchlistSummary: async (movies: string[]) => {
+
+  getWatchlistSummary: async (movies: string[]): Promise<string> => {
     try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Based on this watchlist: ${movies.join(', ')}, describe the "vibe" of this movie fan in two sentences. Start with "The Vibe:".`,
+      const res = await fetch('/api/ai/vibe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ titles: movies }),
       });
-      return response.text || "The Vibe: Eclectic and adventurous with a taste for visual storytelling.";
+      const data = await res.json();
+      return data.text || "The Vibe: A dedicated cinephile building a legacy collection.";
     } catch (error) {
+      console.error("Gemini vibe fetch error:", error);
       return "The Vibe: A dedicated cinephile building a legacy collection.";
     }
   }

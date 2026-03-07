@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import { Movie } from '../types';
 import { ICONS, TMDB_IMAGE_BASE, BACKDROP_SIZE, POSTER_SIZE } from '../constants';
-import { geminiService } from '../services/geminiService';
 import { tmdbService } from '../services/tmdbService';
 import { MovieDetailSkeleton } from './Skeletons';
 import FavoriteButton from './FavoriteButton';
@@ -46,16 +45,27 @@ const MovieDetailModal: React.FC<MovieDetailModalProps> = ({ movie, onClose, onA
     const fetchInsight = async () => {
       setInsight('');
       setLoadingInsight(true);
-      const text = await geminiService.getMovieInsight(movie.title);
-      setInsight(text);
-      setLoadingInsight(false);
+      try {
+        const res = await fetch('/api/ai/movie-insight', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ movieTitle: movie.title }),
+        });
+        const data = await res.json();
+        setInsight(data.insight || '');
+      } catch (error) {
+        console.error('Failed to fetch movie insight:', error);
+        setInsight('An essential piece of cinematic history.');
+      } finally {
+        setLoadingInsight(false);
+      }
     };
 
     fetchFullData();
     fetchInsight();
   }, [movie.id, movie.title, movie.media_type]);
 
-  const backdropUrl = fullMovie.backdrop_path 
+  const backdropUrl = fullMovie.backdrop_path
     ? `${TMDB_IMAGE_BASE}${BACKDROP_SIZE}${fullMovie.backdrop_path}`
     : `${TMDB_IMAGE_BASE}${BACKDROP_SIZE}${fullMovie.poster_path}`;
 
@@ -67,15 +77,15 @@ const MovieDetailModal: React.FC<MovieDetailModalProps> = ({ movie, onClose, onA
     <div className="fixed inset-0 z-50 flex flex-col bg-[#14181c] overflow-y-auto animate-in fade-in slide-in-from-bottom-10 duration-500">
       {/* Hero Backdrop */}
       <div className="relative w-full h-[50vh] flex-shrink-0">
-        <img 
+        <img
           src={backdropUrl}
           className="w-full h-full object-cover transition-opacity duration-1000"
           alt={fullMovie.title}
           onError={(e: any) => { e.target.style.display = 'none'; }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#14181c] via-[#14181c]/40 to-black/40" />
-        
-        <button 
+
+        <button
           onClick={onClose}
           className="absolute top-6 left-6 p-3 bg-black/40 backdrop-blur-xl rounded-full text-white/80 hover:text-white transition-colors border border-white/10 z-20"
         >
@@ -91,12 +101,12 @@ const MovieDetailModal: React.FC<MovieDetailModalProps> = ({ movie, onClose, onA
           <>
             <div className="flex gap-6 items-end">
               <div className="w-32 aspect-[2/3] rounded-xl overflow-hidden shadow-2xl border-2 border-white/10 flex-shrink-0 bg-[#2c343c]">
-                <img 
-                    src={posterUrl}
-                    className="w-full h-full object-cover"
-                    alt={fullMovie.title}
-                    onError={(e: any) => { e.target.src = 'https://via.placeholder.com/500x750?text=No+Poster'; }}
-                  />
+                <img
+                  src={posterUrl}
+                  className="w-full h-full object-cover"
+                  alt={fullMovie.title}
+                  onError={(e: any) => { e.target.src = 'https://via.placeholder.com/500x750?text=No+Poster'; }}
+                />
               </div>
               <div className="flex-1 pb-2 text-left">
                 <h1 className="text-3xl font-black text-white leading-tight mb-1">{fullMovie.title}</h1>
@@ -154,7 +164,7 @@ const MovieDetailModal: React.FC<MovieDetailModalProps> = ({ movie, onClose, onA
         {/* Actions */}
         <div className="flex flex-col gap-3">
           <div className="flex gap-3">
-            <button 
+            <button
               onClick={() => onAddToWatchlist(fullMovie)}
               disabled={loadingDetails}
               className="flex-1 py-4 px-6 bg-[#00e054] text-black font-black text-sm rounded-2xl shadow-xl shadow-[#00e054]/10 hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
@@ -162,12 +172,12 @@ const MovieDetailModal: React.FC<MovieDetailModalProps> = ({ movie, onClose, onA
               {ICONS.Plus}
               ADD TO VAULT
             </button>
-            <FavoriteButton 
-              isFavorite={isFavorite} 
-              onToggle={() => toggleFavorite(fullMovie)} 
+            <FavoriteButton
+              isFavorite={isFavorite}
+              onToggle={() => toggleFavorite(fullMovie)}
             />
           </div>
-          <button 
+          <button
             onClick={onCreateNewVault}
             disabled={loadingDetails}
             className="w-full py-4 border-2 border-dashed border-white/10 text-white/40 font-bold rounded-2xl hover:border-white/30 hover:text-white transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-widest disabled:opacity-50"

@@ -65,7 +65,7 @@ const App: React.FC = () => {
     title: string;
     description: string;
     onConfirm: () => void;
-  }>({ isOpen: false, title: "", description: "", onConfirm: () => {} });
+  }>({ isOpen: false, title: "", description: "", onConfirm: () => { } });
 
   useEffect(() => {
     init();
@@ -117,7 +117,7 @@ const App: React.FC = () => {
       onConfirm: async () => {
         await deleteWatchlist(id);
         setViewingWatchlist(null);
-        setConfirmDelete({ isOpen: false, title: "", description: "", onConfirm: () => {} });
+        setConfirmDelete({ isOpen: false, title: "", description: "", onConfirm: () => { } });
       }
     });
   };
@@ -172,48 +172,48 @@ const App: React.FC = () => {
             <div className="flex overflow-x-auto gap-4 pb-4 no-scrollbar -mx-4 px-4">
               {isInitialLoading
                 ? [...Array(3)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="w-[85vw] h-48 rounded-2xl bg-[#1a2128] animate-pulse flex-shrink-0"
-                    />
-                  ))
+                  <div
+                    key={i}
+                    className="w-[85vw] h-48 rounded-2xl bg-[#1a2128] animate-pulse flex-shrink-0"
+                  />
+                ))
                 : trendingMovies.slice(0, 10).map((movie) => (
-                    <div
-                      key={movie.id}
-                      className="w-[85vw] flex-shrink-0 group"
+                  <div
+                    key={movie.id}
+                    className="w-[85vw] flex-shrink-0 group"
+                  >
+                    <button
+                      onClick={() => setSelectedMovie(movie)}
+                      className="w-full h-48 rounded-2xl overflow-hidden relative shadow-2xl border border-white/10 text-left"
                     >
-                      <button
-                        onClick={() => setSelectedMovie(movie)}
-                        className="w-full h-48 rounded-2xl overflow-hidden relative shadow-2xl border border-white/10 text-left"
-                      >
-                        <img
-                          src={
-                            movie.backdrop_path
-                              ? `${TMDB_IMAGE_BASE}${BACKDROP_SIZE}${movie.backdrop_path}`
-                              : `${TMDB_IMAGE_BASE}${BACKDROP_SIZE}${movie.poster_path}`
-                          }
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                          alt={movie.title}
-                          onError={(e: any) => {
-                            e.target.src =
-                              "https://via.placeholder.com/800x400?text=FilmVault";
-                          }}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-                        <div className="absolute bottom-4 left-4 right-4">
-                          <h3 className="text-xl font-black text-white leading-tight">
-                            {movie.title}
-                          </h3>
-                          <p className="text-white/60 text-xs font-bold mt-1 uppercase tracking-widest">
-                            {movie.release_date
-                              ? new Date(movie.release_date).getFullYear()
-                              : "TBA"}{" "}
-                            • {movie.media_type.toUpperCase()}
-                          </p>
-                        </div>
-                      </button>
-                    </div>
-                  ))}
+                      <img
+                        src={
+                          movie.backdrop_path
+                            ? `${TMDB_IMAGE_BASE}${BACKDROP_SIZE}${movie.backdrop_path}`
+                            : `${TMDB_IMAGE_BASE}${BACKDROP_SIZE}${movie.poster_path}`
+                        }
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                        alt={movie.title}
+                        onError={(e: any) => {
+                          e.target.src =
+                            "https://via.placeholder.com/800x400?text=FilmVault";
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                      <div className="absolute bottom-4 left-4 right-4">
+                        <h3 className="text-xl font-black text-white leading-tight">
+                          {movie.title}
+                        </h3>
+                        <p className="text-white/60 text-xs font-bold mt-1 uppercase tracking-widest">
+                          {movie.release_date
+                            ? new Date(movie.release_date).getFullYear()
+                            : "TBA"}{" "}
+                          • {movie.media_type.toUpperCase()}
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                ))}
             </div>
           </div>
 
@@ -222,11 +222,10 @@ const App: React.FC = () => {
               <button
                 key={f}
                 onClick={() => setFilter(f as any)}
-                className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
-                  filter === f
-                    ? "bg-[#00e054] text-black shadow-lg shadow-[#00e054]/20"
-                    : "bg-white/5 text-white/40 hover:text-white hover:bg-white/10"
-                }`}
+                className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${filter === f
+                  ? "bg-[#00e054] text-black shadow-lg shadow-[#00e054]/20"
+                  : "bg-white/5 text-white/40 hover:text-white hover:bg-white/10"
+                  }`}
               >
                 {f}
               </button>
@@ -237,16 +236,16 @@ const App: React.FC = () => {
             <h2 className="text-white/40 text-[10px] font-black uppercase tracking-[0.4em] mb-6 text-left">
               Discovery Archive
             </h2>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {isLoading
                 ? [...Array(12)].map((_, i) => <MovieCardSkeleton key={i} />)
                 : filteredMovies.map((movie) => (
-                    <MovieCard
-                      key={`${movie.id}-${movie.media_type}`}
-                      movie={movie}
-                      onClick={setSelectedMovie}
-                    />
-                  ))}
+                  <MovieCard
+                    key={`${movie.id}-${movie.media_type}`}
+                    movie={movie}
+                    onClick={setSelectedMovie}
+                  />
+                ))}
             </div>
             <Pagination
               currentPage={trendingPage}
@@ -283,23 +282,21 @@ const App: React.FC = () => {
                       <button
                         key={list.id}
                         onClick={() => openWatchlist(list)}
-                        className={`w-full flex items-center justify-between p-6 rounded-[24px] bg-[#1a2128] border hover:border-white/20 hover:bg-[#2c343c]/30 transition-all group relative overflow-hidden shadow-xl ${
-                          list.title === "Favorites"
-                            ? "border-[#ff8000]/30"
-                            : list.title === "Already Watched"
-                              ? "border-[#00e054]/30"
-                              : "border-white/5"
-                        }`}
+                        className={`w-full flex items-center justify-between p-6 rounded-[24px] bg-[#1a2128] border hover:border-white/20 hover:bg-[#2c343c]/30 transition-all group relative overflow-hidden shadow-xl ${list.title === "Favorites"
+                          ? "border-[#ff8000]/30"
+                          : list.title === "Already Watched"
+                            ? "border-[#00e054]/30"
+                            : "border-white/5"
+                          }`}
                       >
                         <div className="flex items-center gap-5 relative z-10 text-left">
                           <div
-                            className={`w-14 h-14 bg-[#14181c] rounded-2xl flex items-center justify-center shadow-inner ${
-                              list.title === "Favorites"
-                                ? "text-[#ff8000]"
-                                : list.title === "Already Watched"
-                                  ? "text-[#00e054]"
-                                  : "text-white/60"
-                            }`}
+                            className={`w-14 h-14 bg-[#14181c] rounded-2xl flex items-center justify-center shadow-inner ${list.title === "Favorites"
+                              ? "text-[#ff8000]"
+                              : list.title === "Already Watched"
+                                ? "text-[#00e054]"
+                                : "text-white/60"
+                              }`}
                           >
                             {list.title === "Favorites"
                               ? ICONS.Heart
@@ -383,7 +380,7 @@ const App: React.FC = () => {
                 </div>
               </header>
 
-              <div className="grid grid-cols-3 gap-4 pb-32">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-32">
                 {isLoading ? (
                   [...Array(6)].map((_, i) => <MovieCardSkeleton key={i} />)
                 ) : activeWatchlistItems.length > 0 ? (
@@ -443,11 +440,10 @@ const App: React.FC = () => {
                             e.stopPropagation();
                             toggleWatchedStatus(item.id);
                           }}
-                          className={`p-1.5 rounded-full border shadow-xl transition-all ${
-                            item.is_watched
-                              ? "bg-[#00e054] text-black border-[#00e054]"
-                              : "bg-[#14181c] text-white/60 border-white/10 hover:text-[#00e054]"
-                          }`}
+                          className={`p-1.5 rounded-full border shadow-xl transition-all ${item.is_watched
+                            ? "bg-[#00e054] text-black border-[#00e054]"
+                            : "bg-[#14181c] text-white/60 border-white/10 hover:text-[#00e054]"
+                            }`}
                           title={
                             item.is_watched
                               ? "Mark as unwatched"
@@ -511,16 +507,16 @@ const App: React.FC = () => {
 
           {searchQuery.length > 0 ? (
             <div>
-              <div className="grid grid-cols-3 gap-4 text-left">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 text-left">
                 {isLoading && searchResults.length === 0
                   ? [...Array(9)].map((_, i) => <MovieCardSkeleton key={i} />)
                   : searchResults.map((movie) => (
-                      <MovieCard
-                        key={`${movie.id}-${movie.media_type}`}
-                        movie={movie}
-                        onClick={setSelectedMovie}
-                      />
-                    ))}
+                    <MovieCard
+                      key={`${movie.id}-${movie.media_type}`}
+                      movie={movie}
+                      onClick={setSelectedMovie}
+                    />
+                  ))}
                 {!isLoading &&
                   searchQuery.length > 0 &&
                   searchResults.length === 0 && (
@@ -566,7 +562,7 @@ const App: React.FC = () => {
                 <h3 className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mb-4">
                   Trending Today
                 </h3>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   {trendingMovies.slice(0, 3).map((movie) => (
                     <MovieCard
                       key={`${movie.id}-discovery`}
@@ -666,7 +662,7 @@ const App: React.FC = () => {
         title={confirmDelete.title}
         description={confirmDelete.description}
         onConfirm={confirmDelete.onConfirm}
-        onCancel={() => setConfirmDelete({ isOpen: false, title: "", description: "", onConfirm: () => {} })}
+        onCancel={() => setConfirmDelete({ isOpen: false, title: "", description: "", onConfirm: () => { } })}
       />
     </Layout>
   );
