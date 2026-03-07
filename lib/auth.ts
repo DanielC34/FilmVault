@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -6,7 +6,7 @@ if (!JWT_SECRET) {
     throw new Error('Please define the JWT_SECRET environment variable inside .env.local');
 }
 
-export function signToken(payload: object, expiresIn: string | number = '7d'): string {
+export function signToken(payload: object, expiresIn: SignOptions['expiresIn'] = '7d'): string {
     return jwt.sign(payload, JWT_SECRET!, { expiresIn });
 }
 

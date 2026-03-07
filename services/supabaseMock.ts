@@ -9,7 +9,7 @@ const getMockUsers = (): Profile[] => {
     id: 'user_123',
     username: 'cinephile_99',
     avatar_url: 'https://picsum.photos/id/64/200/200',
-  }];
+  } as Profile];
 };
 
 const saveMockUsers = (users: Profile[]) => {
@@ -58,16 +58,16 @@ export const supabaseMock = {
   register: async (email: string) => {
     const users = getMockUsers();
     const username = email.split('@')[0];
-    const newUser: Profile = {
+    const newUser = {
       id: `user_${Math.random().toString(36).substr(2, 9)}`,
       username: username,
       avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
-    };
+    } as Profile;
     users.push(newUser);
     saveMockUsers(users);
     return newUser;
   },
-  
+
   getWatchlists: async () => {
     return [...mockWatchlists];
   },
@@ -120,10 +120,10 @@ export const supabaseMock = {
       is_watched: false
     };
     mockItems.push(newItem);
-    
+
     const list = mockWatchlists.find(w => w.id === watchlistId);
     if (list) list.item_count = (list.item_count || 0) + 1;
-    
+
     return newItem;
   },
 

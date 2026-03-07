@@ -81,17 +81,17 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
         mongoService.getUserProfile(),
         mongoService.getWatchlists()
       ]);
-      
+
       const favList = watchlists.find(
-        (w) => w.is_system_list && w.title === "Favorites",
+        (w: Watchlist) => w.is_system_list && w.title === "Favorites",
       );
       let favorites = new Set<string>();
       if (favList) {
         const items = await mongoService.getWatchlistItems(favList.id);
-        favorites = new Set(items.map((i) => i.media_id));
+        favorites = new Set(items.map((i: WatchlistItem) => i.media_id));
       }
       const trending = await tmdbService.getTrending(1);
-      
+
       set({
         user,
         watchlists,
@@ -201,7 +201,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   toggleFavorite: async (movie: Movie) => {
     const { favoriteIds, watchlists } = get();
     const favList = watchlists.find(
-      (w) => w.is_system_list && w.title === "Favorites",
+      (w: Watchlist) => w.is_system_list && w.title === "Favorites",
     );
     if (!favList) return;
     const isFav = favoriteIds.has(String(movie.id));
@@ -212,7 +212,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
     try {
       if (isFav) {
         const items = await mongoService.getWatchlistItems(favList.id);
-        const item = items.find((i) => i.media_id === String(movie.id));
+        const item = items.find((i: WatchlistItem) => i.media_id === String(movie.id));
         if (item) await mongoService.removeItemFromWatchlist(item.id);
         get().showToast(`Removed from Favorites.`);
       } else {
@@ -261,7 +261,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
       await mongoService.addItemToWatchlist(watchlistId, movie);
       const watchlists = await mongoService.getWatchlists();
       set({ watchlists });
-      const list = watchlists.find((w) => w.id === watchlistId);
+      const list = watchlists.find((w: Watchlist) => w.id === watchlistId);
       get().showToast(`"${movie.title}" added to ${list?.title || "vault"}.`);
     } catch (error) {
       get().showToast("Failed to add movie.", "error");
@@ -340,7 +340,7 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
     // Restore item to original position
     const currentItems = get().activeWatchlistItems;
     const restoredItems = [...currentItems, pendingDelete.item];
-    
+
     set({
       activeWatchlistItems: restoredItems,
       pendingDelete: null,
@@ -352,11 +352,11 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
 
   deleteWatchlist: async (id: string) => {
     try {
-      const list = get().watchlists.find((w) => w.id === id);
+      const list = get().watchlists.find((w: Watchlist) => w.id === id);
       if (list?.is_system_list) return;
       await mongoService.deleteWatchlist(id);
       set((state) => ({
-        watchlists: state.watchlists.filter((w) => w.id !== id),
+        watchlists: state.watchlists.filter((w: Watchlist) => w.id !== id),
       }));
       get().showToast(`Vault "${list?.title || "Archive"}" deleted.`);
     } catch (error) {

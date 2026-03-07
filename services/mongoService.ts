@@ -3,7 +3,7 @@ const API_URL = "/api";
 const getToken = () => localStorage.getItem("fv_token");
 
 export const mongoService = {
-  signUp: async (email, password) => {
+  signUp: async (email: string, password: string) => {
     const res = await fetch(`${API_URL}/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -13,7 +13,7 @@ export const mongoService = {
     return res.json();
   },
 
-  signIn: async (email, password) => {
+  signIn: async (email: string, password: string) => {
     const res = await fetch(`${API_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -30,7 +30,7 @@ export const mongoService = {
     return res.json();
   },
 
-  createWatchlist: async (title, description) => {
+  createWatchlist: async (title: string, description: string) => {
     const res = await fetch(`${API_URL}/watchlists`, {
       method: "POST",
       headers: {
@@ -42,21 +42,21 @@ export const mongoService = {
     return res.json();
   },
 
-  deleteWatchlist: async (id) => {
+  deleteWatchlist: async (id: string) => {
     await fetch(`${API_URL}/watchlists/${id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${getToken()}` },
     });
   },
 
-  getWatchlistItems: async (watchlistId) => {
+  getWatchlistItems: async (watchlistId: string) => {
     const res = await fetch(`${API_URL}/watchlists/${watchlistId}/items`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     });
     return res.json();
   },
 
-  addItemToWatchlist: async (watchlistId, movie) => {
+  addItemToWatchlist: async (watchlistId: string, movie: { id: string | number; media_type: string; title: string; poster_path: string }) => {
     const res = await fetch(`${API_URL}/watchlists/${watchlistId}/items`, {
       method: "POST",
       headers: {
@@ -73,14 +73,14 @@ export const mongoService = {
     return res.json();
   },
 
-  removeItemFromWatchlist: async (itemId) => {
+  removeItemFromWatchlist: async (itemId: string) => {
     await fetch(`${API_URL}/watchlists/items/${itemId}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${getToken()}` },
     });
   },
 
-  toggleWatchedStatus: async (itemId) => {
+  toggleWatchedStatus: async (itemId: string) => {
     const res = await fetch(`${API_URL}/watchlists/items/${itemId}/watched`, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${getToken()}` },
