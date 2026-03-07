@@ -1,19 +1,21 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import { connectDB } from '@/lib/mongodb';
 import { getUserId } from '@/lib/auth';
+import { getParam } from '@/lib/routeParams';
 import Watchlist from '@/lib/models/Watchlist.js';
 import WatchlistItem from '@/lib/models/WatchlistItem.js';
 
 export async function DELETE(
-    req: Request,
-    { params }: { params: { itemId: string } }
+    req: NextRequest,
+    context: { params: Promise<{ itemId: string }> }
 ) {
     try {
+        const { itemId } = await getParam(context);
         getUserId(req); // Validate token
         await connectDB();
 
-        const item = await WatchlistItem.findByIdAndDelete(params.itemId);
+        const item = await WatchlistItem.findByIdAndDelete(itemId);
         if (item) {
             await Watchlist.findByIdAndUpdate(item.watchlist_id, { $inc: { item_count: -1 } });
         }
@@ -26,17 +28,18 @@ export async function DELETE(
 }
 
 export async function PATCH(
-    req: Request,
-    { params }: { params: { itemId: string } }
+    req: NextRequest,
+    context: { params: Promise<{ itemId: string }> }
 ) {
+    const { itemId } = await getParam(context);
     const userId = getUserId(req);
     await connectDB();
     const session = await mongoose.startSession();
-    let item;
+    let item: any;
 
     try {
         await session.withTransaction(async () => {
-            item = await WatchlistItem.findById(params.itemId).session(session);
+            item = await WatchlistItem.findById(itemId).session(session);
             if (!item) {
                 throw new Error('Item not found');
             }
@@ -108,12 +111,16 @@ export async function PATCH(
 
             } else {
                 await WatchlistItem.findByIdAndUpdate(
-                    params.itemId,
+                    itemId,
                     { is_watched: false },
                     { session }
                 );
             }
         });
+
+        if (!item) {
+            return NextResponse.json({ error: 'Item not found' }, { status: 404 });
+        }
 
         return NextResponse.json({
             success: true,
