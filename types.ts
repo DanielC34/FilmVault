@@ -12,6 +12,8 @@ export interface Movie {
   media_type: MediaType;
   genres?: string[];
   runtime?: number;
+  watchlist_item_id?: string;
+  is_watched?: boolean;
 }
 
 export interface Profile {

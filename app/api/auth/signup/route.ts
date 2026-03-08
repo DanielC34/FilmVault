@@ -30,12 +30,20 @@ export async function POST(req: Request) {
             avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
         });
 
-        await Watchlist.create({
-            user_id: user._id,
-            title: 'Favorites',
-            description: 'Your top-tier cinematic picks.',
-            is_system_list: true
-        });
+        await Watchlist.insertMany([
+            {
+                user_id: user._id,
+                title: 'Favorites',
+                description: 'Your top-tier cinematic picks.',
+                is_system_list: true
+            },
+            {
+                user_id: user._id,
+                title: 'Watched',
+                description: 'Movies and shows you have already seen.',
+                is_system_list: true
+            }
+        ]);
 
         const token = signToken({ userId: user._id });
 

@@ -21,9 +21,20 @@ interface MovieDetailModalProps {
   onClose: () => void;
   onAddToWatchlist: (movie: Movie) => void;
   onCreateNewVault: () => void;
+  isWatched?: boolean;
+  onToggleWatched?: () => void;
+  onRemove?: () => void;
 }
 
-const MovieDetailModal: React.FC<MovieDetailModalProps> = ({ movie, onClose, onAddToWatchlist, onCreateNewVault }) => {
+const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
+  movie,
+  onClose,
+  onAddToWatchlist,
+  onCreateNewVault,
+  isWatched,
+  onToggleWatched,
+  onRemove
+}) => {
   const { favoriteIds, toggleFavorite } = useStore();
   const [insight, setInsight] = useState<string>('');
   const [loadingInsight, setLoadingInsight] = useState(true);
@@ -163,28 +174,52 @@ const MovieDetailModal: React.FC<MovieDetailModalProps> = ({ movie, onClose, onA
 
         {/* Actions */}
         <div className="flex flex-col gap-3">
-          <div className="flex gap-3">
+          {onToggleWatched ? (
+            <div className="flex gap-3">
+              <button
+                onClick={onToggleWatched}
+                className={`flex-1 py-4 px-6 font-black text-sm rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 ${isWatched
+                    ? 'bg-[#00e054] text-black shadow-[#00e054]/10'
+                    : 'bg-white/5 text-white/60 border border-white/10 hover:text-[#00e054] hover:border-[#00e054]/50'
+                  }`}
+              >
+                {isWatched ? ICONS.Check : ICONS.Eye}
+                {isWatched ? 'WATCHED' : 'MARK AS WATCHED'}
+              </button>
+              <button
+                onClick={onRemove}
+                className="py-4 px-5 bg-red-500/10 text-red-500 rounded-2xl border border-red-500/20 hover:bg-red-500 hover:text-white transition-all shadow-xl shadow-red-500/5 flex items-center justify-center"
+              >
+                {ICONS.X}
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-3">
+              <button
+                onClick={() => onAddToWatchlist(fullMovie)}
+                disabled={loadingDetails}
+                className="flex-1 py-4 px-6 bg-[#00e054] text-black font-black text-sm rounded-2xl shadow-xl shadow-[#00e054]/10 hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {ICONS.Plus}
+                ADD TO VAULT
+              </button>
+              <FavoriteButton
+                isFavorite={isFavorite}
+                onToggle={() => toggleFavorite(fullMovie)}
+              />
+            </div>
+          )}
+
+          {!onToggleWatched && (
             <button
-              onClick={() => onAddToWatchlist(fullMovie)}
+              onClick={onCreateNewVault}
               disabled={loadingDetails}
-              className="flex-1 py-4 px-6 bg-[#00e054] text-black font-black text-sm rounded-2xl shadow-xl shadow-[#00e054]/10 hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-4 border-2 border-dashed border-white/10 text-white/40 font-bold rounded-2xl hover:border-white/30 hover:text-white transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-widest disabled:opacity-50"
             >
-              {ICONS.Plus}
-              ADD TO VAULT
+              {ICONS.List}
+              CREATE NEW VAULT
             </button>
-            <FavoriteButton
-              isFavorite={isFavorite}
-              onToggle={() => toggleFavorite(fullMovie)}
-            />
-          </div>
-          <button
-            onClick={onCreateNewVault}
-            disabled={loadingDetails}
-            className="w-full py-4 border-2 border-dashed border-white/10 text-white/40 font-bold rounded-2xl hover:border-white/30 hover:text-white transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-widest disabled:opacity-50"
-          >
-            {ICONS.List}
-            CREATE NEW VAULT
-          </button>
+          )}
         </div>
       </div>
     </div>
