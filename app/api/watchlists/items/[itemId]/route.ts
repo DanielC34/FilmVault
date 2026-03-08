@@ -51,13 +51,13 @@ export async function PATCH(
 
                 let watchedList = await Watchlist.findOne({
                     user_id: userId,
-                    title: 'Already Watched'
+                    title: 'Watched'
                 }).session(session);
 
                 if (!watchedList) {
                     watchedList = await Watchlist.create([{
                         user_id: userId,
-                        title: 'Already Watched',
+                        title: 'Watched',
                         description: 'A complete record of your cinematic journey.',
                         is_system_list: true
                     }], { session });
