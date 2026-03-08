@@ -380,14 +380,14 @@ const App: React.FC = () => {
                 </div>
               </header>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-32">
+              <div className="flex flex-col gap-3 pb-32">
                 {isLoading ? (
                   [...Array(6)].map((_, i) => <MovieCardSkeleton key={i} />)
                 ) : activeWatchlistItems.length > 0 ? (
                   activeWatchlistItems.map((item: WatchlistItem) => (
                     <div
                       key={item.id}
-                      className="relative group focus-within:ring-2 focus-within:ring-[#00e054] focus-within:rounded-xl"
+                      className="flex items-center gap-4 bg-[#1a2128] p-3 rounded-2xl border border-white/5 active:bg-white/5 transition-colors"
                     >
                       <button
                         onClick={() =>
@@ -400,12 +400,14 @@ const App: React.FC = () => {
                             release_date: "",
                             vote_average: 0,
                             media_type: item.media_type,
+                            watchlist_item_id: item.id,
+                            is_watched: item.is_watched,
                           })
                         }
-                        className="w-full text-left focus:outline-none"
+                        className="flex flex-1 items-center gap-4 text-left focus:outline-none group min-w-0"
                       >
                         <div
-                          className={`aspect-[2/3] w-full rounded-lg overflow-hidden relative shadow-lg bg-[#2c343c] transition-opacity duration-300 ${item.is_watched ? "opacity-40" : "opacity-100"}`}
+                          className={`w-16 h-24 rounded-lg overflow-hidden relative shadow-lg bg-[#2c343c] flex-shrink-0 transition-opacity duration-300 ${item.is_watched ? "opacity-40" : "opacity-100"}`}
                         >
                           <img
                             src={
@@ -414,7 +416,7 @@ const App: React.FC = () => {
                                 : "https://via.placeholder.com/500x750?text=No+Poster"
                             }
                             alt={item.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            className="w-full h-full object-cover"
                             onError={(e: any) => {
                               e.target.src =
                                 "https://via.placeholder.com/500x750?text=No+Poster";
@@ -422,27 +424,38 @@ const App: React.FC = () => {
                           />
                           {item.is_watched && (
                             <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                              <div className="p-2 bg-[#00e054] text-black rounded-full shadow-lg border-2 border-white/20 animate-in zoom-in-50">
+                              <div className="p-1 bg-[#00e054] text-black rounded-full shadow-lg border-2 border-white/20 scale-75">
                                 {ICONS.Check}
                               </div>
                             </div>
                           )}
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                         </div>
-                        <h4 className="mt-2 text-[10px] font-bold text-white/80 truncate group-hover:text-white">
-                          {item.title}
-                        </h4>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-black text-white truncate group-hover:text-[#00e054] transition-colors">
+                            {item.title}
+                          </h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] font-black text-white/30 uppercase tracking-widest bg-white/5 px-1.5 py-0.5 rounded">
+                              {item.media_type}
+                            </span>
+                            {item.is_watched && (
+                              <span className="text-[10px] font-black text-[#00e054] uppercase tracking-widest">
+                                WATCHED
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </button>
 
-                      <div className="absolute -top-1.5 -right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                      <div className="flex items-center gap-2 pr-1">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleWatchedStatus(item.id);
                           }}
-                          className={`p-1.5 rounded-full border shadow-xl transition-all ${item.is_watched
+                          className={`w-12 h-12 flex items-center justify-center rounded-xl border transition-all ${item.is_watched
                             ? "bg-[#00e054] text-black border-[#00e054]"
-                            : "bg-[#14181c] text-white/60 border-white/10 hover:text-[#00e054]"
+                            : "bg-[#14181c] text-white/40 border-white/10 hover:text-[#00e054] hover:border-[#00e054]/30"
                             }`}
                           title={
                             item.is_watched
@@ -450,7 +463,7 @@ const App: React.FC = () => {
                               : "Mark as watched"
                           }
                         >
-                          <div className="scale-[0.85]">
+                          <div className="scale-110">
                             {item.is_watched ? ICONS.Check : ICONS.Eye}
                           </div>
                         </button>
@@ -459,10 +472,10 @@ const App: React.FC = () => {
                             e.stopPropagation();
                             removeFromWatchlist(item.id);
                           }}
-                          className="p-1.5 bg-[#14181c] text-red-500 rounded-full border border-red-500/20 shadow-xl hover:bg-red-500 hover:text-white"
+                          className="w-12 h-12 flex items-center justify-center bg-red-500/10 text-red-500/60 rounded-xl border border-red-500/20 hover:bg-red-500 hover:text-white transition-all"
                           title="Remove from vault"
                         >
-                          <div className="scale-[0.85]">{ICONS.X}</div>
+                          <div className="scale-110">{ICONS.X}</div>
                         </button>
                       </div>
                     </div>
@@ -626,6 +639,12 @@ const App: React.FC = () => {
       {selectedMovie && (
         <MovieDetailModal
           movie={selectedMovie}
+          isWatched={selectedMovie.is_watched}
+          onToggleWatched={selectedMovie.watchlist_item_id ? () => toggleWatchedStatus(selectedMovie.watchlist_item_id!) : undefined}
+          onRemove={selectedMovie.watchlist_item_id ? () => {
+            removeFromWatchlist(selectedMovie.watchlist_item_id!);
+            setSelectedMovie(null);
+          } : undefined}
           onClose={() => setSelectedMovie(null)}
           onAddToWatchlist={(movie) => {
             setSelectedMovie(null);
