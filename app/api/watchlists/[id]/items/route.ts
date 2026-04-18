@@ -4,6 +4,7 @@ import { getUserId } from '@/lib/auth';
 import { getParam } from '@/lib/routeParams';
 import Watchlist from '@/lib/models/Watchlist.js';
 import WatchlistItem from '@/lib/models/WatchlistItem.js';
+import { apiError } from '@/lib/apiError';
 
 export async function GET(
     req: NextRequest,
@@ -27,8 +28,7 @@ export async function GET(
             added_at: i.createdAt
         })));
     } catch (error: any) {
-        const status = error.message === 'No token provided' || error.message === 'Invalid token' ? 401 : 400;
-        return NextResponse.json({ error: error.message }, { status });
+        return apiError(error);
     }
 }
 
@@ -63,7 +63,6 @@ export async function POST(
             added_at: item.createdAt
         });
     } catch (error: any) {
-        const status = error.message === 'No token provided' || error.message === 'Invalid token' ? 401 : 400;
-        return NextResponse.json({ error: error.message }, { status });
+        return apiError(error);
     }
 }

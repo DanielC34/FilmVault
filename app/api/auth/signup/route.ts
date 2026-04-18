@@ -4,6 +4,7 @@ import { signToken } from '@/lib/auth';
 import { connectDB } from '@/lib/mongodb';
 import User from '@/lib/models/User.js';
 import Watchlist from '@/lib/models/Watchlist.js';
+import { apiError } from '@/lib/apiError';
 
 export async function POST(req: Request) {
     try {
@@ -57,6 +58,6 @@ export async function POST(req: Request) {
             }
         });
     } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
+        return apiError(error);
     }
 }
