@@ -61,9 +61,12 @@ export interface Toast {
 export interface AppState {
   user: Profile | null;
   session: any | null; // Supabase Session
-  isAuthLoading: boolean;
+  isInitialLoading: boolean;
+  isNavigating: boolean;
+  isRefreshing: boolean;
   watchlists: Watchlist[];
   activeWatchlistItems: WatchlistItem[];
+  watchlistCache: Record<string, WatchlistItem[]>;
   favoriteIds: Set<string>;
   isLoading: boolean;
   searchQuery: string;

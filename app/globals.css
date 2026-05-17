@@ -47,6 +47,7 @@ body {
   scrollbar-width: none;
 }
 
+
 @keyframes toast-progress {
   from {
     width: 100%;
@@ -57,4 +58,10 @@ body {
 }
 .animate-toast-progress {
   animation: toast-progress 3s linear forwards;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
 }

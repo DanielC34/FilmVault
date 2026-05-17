@@ -4,6 +4,8 @@ import User from '@/lib/models/User.js';
 import { getUserId } from '@/lib/auth';
 import { apiError } from '@/lib/apiError';
 
+export const runtime = 'nodejs';
+
 export async function GET(req: Request) {
     try {
         const userId = getUserId(req);

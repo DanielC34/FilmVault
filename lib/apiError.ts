@@ -27,10 +27,20 @@ export function apiError(error: any): NextResponse {
     }
 
     // MongoDB connection failures → 503 Service Unavailable
-    if (message.includes('ECONNREFUSED') || message.includes('MongoNetworkError') || message.includes('connect')) {
+    if (
+        message.includes('ECONNREFUSED') || 
+        message.includes('MongoNetworkError') || 
+        message.includes('connect') ||
+        message.includes('ServerSelectionError')
+    ) {
         console.error('[DB] Connection failed:', message);
+        const isWhitelistError = message.includes('ServerSelectionError') || message.includes('timeout');
         return NextResponse.json(
-            { error: 'Database unavailable. Please try again shortly.' },
+            { 
+                error: isWhitelistError 
+                    ? 'Database connection timeout. Please ensure your IP is whitelisted in MongoDB Atlas.' 
+                    : 'Database unavailable. Please try again shortly.' 
+            },
             { status: 503 }
         );
     }

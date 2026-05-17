@@ -4,6 +4,8 @@ import { getUserId } from '@/lib/auth';
 import Watchlist from '@/lib/models/Watchlist.js';
 import { apiError } from '@/lib/apiError';
 
+export const runtime = 'nodejs';
+
 export async function GET(req: Request) {
     try {
         const userId = getUserId(req);

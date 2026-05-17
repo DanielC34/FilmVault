@@ -6,10 +6,17 @@ import User from '@/lib/models/User.js';
 import Watchlist from '@/lib/models/Watchlist.js';
 import { apiError } from '@/lib/apiError';
 
+export const runtime = 'nodejs';
+
 export async function POST(req: Request) {
     try {
+        console.log('[Signup API] HIT');
         await connectDB();
-        const { email, password } = await req.json();
+        console.log('[Signup API] DB CONNECTED');
+        
+        const body = await req.json();
+        const { email, password } = body;
+        console.log(`[Signup API] Attempting signup for: ${email}`);
 
         if (!email || !password) {
             return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
@@ -21,6 +28,7 @@ export async function POST(req: Request) {
         // Check if user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
+            console.warn(`[Signup API] Signup blocked: User ${email} already exists.`);
             return NextResponse.json({ error: 'User already exists' }, { status: 400 });
         }
 
@@ -30,6 +38,8 @@ export async function POST(req: Request) {
             username,
             avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
         });
+
+        console.log(`[Signup API] User created successfully: ${user._id}. Initializing default vaults...`);
 
         await Watchlist.insertMany([
             {
@@ -46,6 +56,8 @@ export async function POST(req: Request) {
             }
         ]);
 
+        console.log(`[Signup API] Vaults created. Signing token...`);
+
         const token = signToken({ userId: user._id });
 
         return NextResponse.json({
@@ -58,6 +70,10 @@ export async function POST(req: Request) {
             }
         });
     } catch (error: any) {
-        return apiError(error);
+        console.error('[Signup API] ERROR', error);
+        return NextResponse.json(
+            { error: 'Internal server error or database connection failed.' }, 
+            { status: 500 }
+        );
     }
 }
