@@ -1,14 +1,13 @@
 import { create } from "zustand";
 import {
   AppState,
-  Profile,
   Watchlist,
-  WatchlistItem,
   Movie,
   Toast,
 } from "../types";
-import { mongoService } from "../services/mongoService";
-import { tmdbService } from "../services/tmdbService";
+import { authManager } from "../domain/authManager";
+import { movieManager } from "../domain/movieManager";
+import { watchlistManager } from "../domain/watchlistManager";
 
 interface AppActions {
   init: () => Promise<void>;
@@ -39,9 +38,12 @@ interface AppActions {
 export const useStore = create<AppState & AppActions>((set, get) => ({
   user: null,
   session: null,
-  isAuthLoading: true,
+  isInitialLoading: false,
+  isNavigating: false,
+  isRefreshing: false,
   watchlists: [],
   activeWatchlistItems: [],
+  watchlistCache: {},
   favoriteIds: new Set(),
   isLoading: false,
   searchQuery: "",
@@ -55,53 +57,40 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   pendingDelete: null,
 
   init: async () => {
-    const token = localStorage.getItem("fv_token");
-
-    if (token) {
-      set({
-        session: { user: { id: "user" }, access_token: token },
-        isAuthLoading: false,
-      });
-
-      try {
+    set({ isInitialLoading: true });
+    try {
+      const data = await authManager.initSession();
+      if (data) {
+        set({ session: data.session, user: data.user as any });
         await get().loadUserData();
-      } catch (error) {
-        console.error("Failed to load user data", error);
-        // DO NOT remove token here
       }
-    } else {
-      set({ isAuthLoading: false });
+    } catch (error) {
+      console.error("Failed to initialize session", error);
+    } finally {
+      set({ isInitialLoading: false });
     }
   },
 
   loadUserData: async () => {
-    set({ isLoading: true });
+    const { watchlists: currentWatchlists, trendingMovies: currentTrending } = get();
+    const isFirstLoad = currentWatchlists.length === 0;
+    set(isFirstLoad ? { isInitialLoading: true } : { isRefreshing: true });
+
     try {
-      const [user, watchlists] = await Promise.all([
-        mongoService.getUserProfile(),
-        mongoService.getWatchlists()
+      const { watchlists } = await watchlistManager.fetchUserWatchlists();
+      
+      // Optimization: Parallel fetch but only fetch trending if cache is empty
+      const [favData, trendingData] = await Promise.all([
+        watchlistManager.fetchFavorites(watchlists),
+        currentTrending.length === 0 ? movieManager.getTrendingMovies(1) : Promise.resolve(null)
       ]);
 
-      const favList = watchlists.find(
-        (w: Watchlist) => w.is_system_list && w.title === "Favorites",
-      );
-      let favorites = new Set<string>();
-      if (favList) {
-        const items = await mongoService.getWatchlistItems(favList.id);
-        favorites = new Set(items.map((i: WatchlistItem) => i.media_id));
-      }
-      const trending = await tmdbService.getTrending(1);
+      const newState: any = { watchlists, favoriteIds: favData.favoriteIds };
+      if (trendingData) newState.trendingMovies = trendingData.trendingMovies;
 
-      set({
-        user,
-        watchlists,
-        favoriteIds: favorites,
-        trendingMovies: trending,
-        isLoading: false,
-      });
-    } catch (error) {
-      console.error('Failed to load user data:', error);
-      set({ isLoading: false });
+      set(newState);
+    } finally {
+      set({ isInitialLoading: false, isRefreshing: false });
     }
   },
 
@@ -111,9 +100,10 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
 
   signInWithPassword: async (email, password) => {
     try {
-      const { token, user } = await mongoService.signIn(email, password);
-      localStorage.setItem("fv_token", token);
-      set({ session: { user: { id: user.id }, access_token: token }, user });
+      const data = await authManager.signIn(email, password);
+      set({ session: data.session, user: data.user as any });
+      // Reset cache on login
+      set({ watchlistCache: {}, activeWatchlistItems: [] });
       await get().loadUserData();
       get().showToast("Access granted. Welcome back.");
       return true;
@@ -125,9 +115,9 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
 
   signUpWithEmail: async (email, password) => {
     try {
-      const { token, user } = await mongoService.signUp(email, password);
-      localStorage.setItem("fv_token", token);
-      set({ session: { user: { id: user.id }, access_token: token }, user });
+      const data = await authManager.signUp(email, password);
+      set({ session: data.session, user: data.user as any });
+      set({ watchlistCache: {}, activeWatchlistItems: [] });
       await get().loadUserData();
       get().showToast("Vault initialized. Welcome.");
       return true;
@@ -138,229 +128,218 @@ export const useStore = create<AppState & AppActions>((set, get) => ({
   },
 
   signInWithGoogle: async () => {
-    get().showToast("Google Auth not implemented yet.", "info");
+    set({ isInitialLoading: true });
+    try {
+      const data = await authManager.signInWithGoogle();
+      set({ session: data.session, user: data.user as any });
+      set({ watchlistCache: {}, activeWatchlistItems: [] });
+      await get().loadUserData();
+      get().showToast("Google Entry Secure. Welcome.");
+    } catch (error: any) {
+      get().showToast("Google Auth failed.", "error");
+    } finally {
+      set({ isInitialLoading: false });
+    }
   },
 
   signOut: async () => {
-    localStorage.removeItem("fv_token");
-    set({ session: null, user: null });
+    await authManager.signOut();
+    set({ session: null, user: null, watchlists: [], watchlistCache: {}, activeWatchlistItems: [], favoriteIds: new Set() });
     get().showToast("Logged out of the vault.");
   },
 
-  showToast: (message: string, type: Toast["type"] = "success", action?: Toast["action"]) => {
-    const id = Math.random().toString(36).substring(7);
-    set({ toast: { id, message, type, action } });
-    setTimeout(() => {
-      if (get().toast?.id === id) {
-        set({ toast: null });
-      }
-    }, action ? 6000 : 3000); // Longer duration for undo toasts
+  showToast: (message, type = "success", action) => {
+    set({ toast: { id: Math.random().toString(36).substring(7), message, type, action } });
   },
 
   hideToast: () => set({ toast: null }),
 
-  setSearchQuery: async (query: string) => {
+  setSearchQuery: async (query) => {
     set({ searchQuery: query, searchPage: 1 });
     if (query.length > 2) {
       set({ isLoading: true });
-      try {
-        const results = await tmdbService.search(query, 1);
-        set({ searchResults: results, isLoading: false });
-      } catch (error) {
-        set({ searchResults: [], isLoading: false });
-      }
+      const patch = await movieManager.searchMovies(query, 1);
+      set({ ...patch, isLoading: false });
     } else {
       set({ searchResults: [] });
     }
   },
 
-  setSearchPage: async (page: number) => {
+  setSearchPage: async (page) => {
     const { searchQuery } = get();
     if (!searchQuery) return;
-    set({ isLoading: true, searchPage: page });
-    try {
-      const results = await tmdbService.search(searchQuery, page);
-      set({ searchResults: results, isLoading: false });
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (error) {
-      set({ isLoading: false });
-    }
+    set({ isNavigating: true, searchPage: page });
+    const patch = await movieManager.searchMovies(searchQuery, page);
+    set({ ...patch, isNavigating: false });
   },
 
-  setTrendingPage: async (page: number) => {
-    set({ isLoading: true, trendingPage: page });
-    try {
-      const trending = await tmdbService.getTrending(page);
-      set({ trendingMovies: trending, isLoading: false });
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (error) {
-      set({ isLoading: false });
-    }
+  setTrendingPage: async (page) => {
+    set({ isNavigating: true, trendingPage: page });
+    const patch = await movieManager.getTrendingMovies(page);
+    set({ ...patch, isNavigating: false });
   },
 
-  toggleFavorite: async (movie: Movie) => {
-    const { favoriteIds, watchlists } = get();
-    const favList = watchlists.find(
-      (w: Watchlist) => w.is_system_list && w.title === "Favorites",
-    );
+  toggleFavorite: async (movie) => {
+    const { favoriteIds, watchlists, activeWatchlistItems } = get();
+    const favList = watchlists.find(w => w.is_system_list && w.title === "Favorites");
     if (!favList) return;
-    const isFav = favoriteIds.has(String(movie.id));
-    const newFavs = new Set(favoriteIds);
-    if (isFav) newFavs.delete(String(movie.id));
-    else newFavs.add(String(movie.id));
-    set({ favoriteIds: newFavs });
+
+    const { isFav, newFavoriteIds } = movieManager.calculateFavoriteToggle(movie, favoriteIds);
+    set({ favoriteIds: newFavoriteIds });
+
     try {
-      if (isFav) {
-        const items = await mongoService.getWatchlistItems(favList.id);
-        const item = items.find((i: WatchlistItem) => i.media_id === String(movie.id));
-        if (item) await mongoService.removeItemFromWatchlist(item.id);
-        get().showToast(`Removed from Favorites.`);
-      } else {
-        await mongoService.addItemToWatchlist(favList.id, movie);
-        get().showToast(`Added to Favorites.`);
-      }
-      const updatedWatchlists = await mongoService.getWatchlists();
-      set({ watchlists: updatedWatchlists });
+      const patch = await watchlistManager.syncFavorite(isFav, movie, favList.id, activeWatchlistItems);
+      // Invalidate cache for favorites list
+      const newCache = { ...get().watchlistCache };
+      delete newCache[favList.id];
+      set({ ...patch, watchlistCache: newCache });
+      get().showToast(isFav ? "Removed from Favorites." : "Added to Favorites.");
     } catch (error) {
       set({ favoriteIds });
       get().showToast("Failed to update favorites.", "error");
     }
   },
 
-  toggleWatchedStatus: async (itemId: string) => {
+  toggleWatchedStatus: async (itemId) => {
+    const previousItems = get().activeWatchlistItems;
+    const item = previousItems.find((i) => i.id === itemId);
+    if (!item) return;
+
+    const newStatus = !item.is_watched;
+    const updatedItems = previousItems.map(i => i.id === itemId ? { ...i, is_watched: newStatus } : i);
+    set({ activeWatchlistItems: updatedItems });
+
     try {
-      const result = await mongoService.toggleWatchedStatus(itemId);
-      const items = get().activeWatchlistItems.map((item) =>
-        item.id === itemId ? { ...item, is_watched: result } : item,
-      );
-      set({ activeWatchlistItems: items });
-      const watchlists = await mongoService.getWatchlists();
+      const { result, watchlists } = await watchlistManager.toggleWatched(itemId);
+      if (result !== newStatus) {
+        const syncedItems = get().activeWatchlistItems.map(i => i.id === itemId ? { ...i, is_watched: result } : i);
+        set({ activeWatchlistItems: syncedItems });
+        // Update cache
+        const newCache = { ...get().watchlistCache };
+        if (item.watchlist_id && newCache[item.watchlist_id]) {
+          newCache[item.watchlist_id] = syncedItems;
+        }
+        set({ watchlistCache: newCache });
+      }
       set({ watchlists });
-      get().showToast(
-        result ? "Archived in history." : "Returned to watchlist.",
-      );
+      get().showToast(result ? "Archived in history." : "Returned to watchlist.");
     } catch (error) {
+      set({ activeWatchlistItems: previousItems });
       get().showToast("Failed to update status.", "error");
     }
   },
 
-  createWatchlist: async (title: string, description: string) => {
+  createWatchlist: async (title, description) => {
     try {
-      const newList = await mongoService.createWatchlist(title, description);
+      const { newList } = await watchlistManager.createVault(title, description);
       set((state) => ({ watchlists: [...state.watchlists, newList] }));
       get().showToast(`Vault "${title}" created successfully.`);
       return newList;
     } catch (error) {
       get().showToast("Failed to create vault.", "error");
-      return undefined;
     }
   },
 
-  addToWatchlist: async (watchlistId: string, movie: Movie) => {
+  addToWatchlist: async (watchlistId, movie) => {
     try {
-      await mongoService.addItemToWatchlist(watchlistId, movie);
-      const watchlists = await mongoService.getWatchlists();
-      set({ watchlists });
-      const list = watchlists.find((w: Watchlist) => w.id === watchlistId);
+      const patch = await watchlistManager.addItem(watchlistId, movie);
+      // Invalidate cache for target list
+      const newCache = { ...get().watchlistCache };
+      delete newCache[watchlistId];
+      set({ ...patch, watchlistCache: newCache });
+      const list = patch.watchlists.find((w: Watchlist) => w.id === watchlistId);
       get().showToast(`"${movie.title}" added to ${list?.title || "vault"}.`);
     } catch (error) {
       get().showToast("Failed to add movie.", "error");
     }
   },
 
-  fetchWatchlistItems: async (watchlistId: string) => {
-    set({ isLoading: true });
+  fetchWatchlistItems: async (watchlistId) => {
+    const { watchlistCache } = get();
+    if (watchlistCache[watchlistId]) {
+      set({ activeWatchlistItems: watchlistCache[watchlistId] });
+      return;
+    }
+
+    set({ isNavigating: true });
     try {
-      const items = await mongoService.getWatchlistItems(watchlistId);
-      set({ activeWatchlistItems: items, isLoading: false });
+      const patch = await watchlistManager.fetchItems(watchlistId);
+      set({ 
+        ...patch, 
+        isNavigating: false,
+        watchlistCache: { ...watchlistCache, [watchlistId]: patch.activeWatchlistItems }
+      });
     } catch (error) {
-      set({ isLoading: false });
+      set({ isNavigating: false });
     }
   },
 
-  removeFromWatchlist: async (itemId: string) => {
-    const item = get().activeWatchlistItems.find((i) => i.id === itemId);
+  removeFromWatchlist: async (itemId) => {
+    const currentItems = get().activeWatchlistItems;
+    const item = currentItems.find(i => i.id === itemId);
     if (!item) return;
 
-    // Clear any existing pending delete
-    const { pendingDelete } = get();
-    if (pendingDelete) {
-      clearTimeout(pendingDelete.timerId);
-    }
+    const watchlistId = item.watchlist_id;
 
-    // Optimistically remove from UI
-    const currentItems = get().activeWatchlistItems;
-    const itemIndex = currentItems.findIndex((i) => i.id === itemId);
-    set({
-      activeWatchlistItems: currentItems.filter((i) => i.id !== itemId),
+    // Optimistic removal
+    set({ activeWatchlistItems: currentItems.filter(i => i.id !== itemId) });
+    set({ pendingDelete: { item, watchlistId, timerId: null as any } });
+
+    get().showToast(`"${item.title}" removed from vault.`, "info", {
+      label: "Undo",
+      onClick: () => get().undoDelete(),
     });
 
-    // Set up undo timer
-    const timerId = setTimeout(async () => {
-      try {
-        await mongoService.removeItemFromWatchlist(itemId);
-        const watchlists = await mongoService.getWatchlists();
-        set({ watchlists, pendingDelete: null });
-      } catch (error) {
-        // Restore item on error
-        const restoredItems = [...get().activeWatchlistItems];
-        restoredItems.splice(itemIndex, 0, item);
-        set({ activeWatchlistItems: restoredItems, pendingDelete: null });
+    const patch = await watchlistManager.removeItemWithDelay(itemId);
+    if (patch) {
+      if ('error' in patch) {
+        set({ activeWatchlistItems: currentItems, pendingDelete: null });
         get().showToast("Failed to remove item.", "error");
+      } else {
+        // Update cache on successful removal
+        const newCache = { ...get().watchlistCache };
+        if (watchlistId && newCache[watchlistId]) {
+          newCache[watchlistId] = newCache[watchlistId].filter(i => i.id !== itemId);
+        }
+        set({ ...patch, watchlistCache: newCache });
       }
-    }, 6000);
-
-    // Store pending delete state
-    set({
-      pendingDelete: {
-        item,
-        watchlistId: item.watchlist_id,
-        timerId,
-      },
-    });
-
-    // Show undo toast
-    get().showToast(
-      `"${item.title}" removed from vault.`,
-      "info",
-      {
-        label: "Undo",
-        onClick: () => get().undoDelete(),
-      }
-    );
+    }
   },
 
   undoDelete: () => {
-    const { pendingDelete } = get();
+    const { pendingDelete, activeWatchlistItems, watchlistCache } = get();
     if (!pendingDelete) return;
 
-    // Cancel the timer
-    clearTimeout(pendingDelete.timerId);
+    if (watchlistManager.cancelRemoval(pendingDelete.item.id)) {
+      const restoredItems = [...activeWatchlistItems, pendingDelete.item];
+      
+      // Update cache
+      const newCache = { ...watchlistCache };
+      if (pendingDelete.watchlistId && newCache[pendingDelete.watchlistId]) {
+        newCache[pendingDelete.watchlistId] = [...newCache[pendingDelete.watchlistId], pendingDelete.item];
+      }
 
-    // Restore item to original position
-    const currentItems = get().activeWatchlistItems;
-    const restoredItems = [...currentItems, pendingDelete.item];
-
-    set({
-      activeWatchlistItems: restoredItems,
-      pendingDelete: null,
-      toast: null, // Hide the undo toast
-    });
-
-    get().showToast(`"${pendingDelete.item.title}" restored.`);
+      set({
+        activeWatchlistItems: restoredItems,
+        watchlistCache: newCache,
+        pendingDelete: null,
+        toast: null,
+      });
+      get().showToast(`"${pendingDelete.item.title}" restored.`);
+    }
   },
 
-  deleteWatchlist: async (id: string) => {
+  deleteWatchlist: async (id) => {
     try {
-      const list = get().watchlists.find((w: Watchlist) => w.id === id);
-      if (list?.is_system_list) return;
-      await mongoService.deleteWatchlist(id);
-      set((state) => ({
-        watchlists: state.watchlists.filter((w: Watchlist) => w.id !== id),
-      }));
-      get().showToast(`Vault "${list?.title || "Archive"}" deleted.`);
-    } catch (error) {
-      get().showToast("Failed to delete vault.", "error");
+      const patch = await watchlistManager.deleteVault(id, get().watchlists);
+      const newCache = { ...get().watchlistCache };
+      delete newCache[id];
+      set({ ...patch, watchlistCache: newCache });
+      get().showToast("Vault deleted.");
+    } catch (error: any) {
+      get().showToast(error.message || "Failed to delete vault.", "error");
     }
   },
 }));
+
+export default useStore;

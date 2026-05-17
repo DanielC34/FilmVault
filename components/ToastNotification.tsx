@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Toast } from '../types';
 import { ICONS } from '../constants';
 import { CheckCircle, AlertCircle, Info, X } from 'lucide-react';
@@ -10,6 +9,14 @@ interface ToastNotificationProps {
 }
 
 const ToastNotification: React.FC<ToastNotificationProps> = ({ toast, onClose }) => {
+  useEffect(() => {
+    const delay = toast.action ? 6000 : 3000;
+    const timer = setTimeout(() => {
+      onClose();
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [toast.id, onClose, toast.action]);
+
   const getIcon = () => {
     switch (toast.type) {
       case 'success': return <CheckCircle size={18} className="text-[#00e054]" />;

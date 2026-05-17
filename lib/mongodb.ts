@@ -1,16 +1,12 @@
 import mongoose from 'mongoose';
 
 const MONGODB_URI = process.env.MONGODB_URI;
+const DB_NAME = process.env.DB_NAME || 'filmvault';
 
 if (!MONGODB_URI) {
-    throw new Error('Please define the MONGODB_URI environment variable inside .env.local');
+    throw new Error('[DB] Please define the MONGODB_URI environment variable inside .env or .env.local');
 }
 
-/**
- * Global is used here to maintain a cached connection across hot reloads
- * in development. This prevents connections from growing exponentially
- * during API Route usage.
- */
 interface MongooseCache {
     conn: typeof mongoose | null;
     promise: Promise<typeof mongoose> | null;
@@ -27,24 +23,38 @@ if (!cached) {
 }
 
 async function connectDB() {
+    // 1. Ensure MONGODB_URI is validated before use
+    if (!process.env.MONGODB_URI) {
+        const err = new Error('[DB] MONGODB_URI environment variable is missing.');
+        console.error('[DB] Connection failed with full error:', err);
+        throw err;
+    }
+
     if (cached?.conn) {
         return cached.conn;
     }
 
     if (!cached?.promise) {
         const opts = {
-            bufferCommands: false,
+            bufferCommands: true,
+            dbName: DB_NAME,
+            serverSelectionTimeoutMS: 10000,
         };
 
-        cached!.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
-            return mongoose;
-        });
+        // 2. Clear logging: Attempting connection
+        console.log('[DB] Attempting connection');
+        cached!.promise = mongoose.connect(process.env.MONGODB_URI, opts);
     }
 
     try {
+        // 3. Ensure mongoose.connect is properly awaited
         cached!.conn = await cached!.promise;
-    } catch (e) {
-        cached!.promise = null;
+        // 4. Clear logging: Connected successfully
+        console.log('[DB] Connected successfully');
+    } catch (e: any) {
+        // 5. Clear logging: Connection failed with full error & do NOT hide stack trace
+        console.error('[DB] Connection failed with full error:', e);
+        cached!.promise = null; // Reset promise so subsequent requests can retry
         throw e;
     }
 

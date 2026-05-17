@@ -5,6 +5,8 @@ import { connectDB } from '@/lib/mongodb';
 import User from '@/lib/models/User.js';
 import { apiError } from '@/lib/apiError';
 
+export const runtime = 'nodejs';
+
 export async function POST(req: Request) {
     try {
         await connectDB();
