@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
 import { ICONS, THEME } from '../constants';
-import GoogleLoginButton from './GoogleLoginButton';
 import { useStore } from '../store/useStore';
 import { Eye, EyeOff, Sparkles } from 'lucide-react';
 
@@ -127,18 +126,6 @@ const AuthScreen: React.FC = () => {
                 )}
               </button>
             </form>
-
-            <div className="relative flex items-center justify-center">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-white/5"></div>
-              </div>
-              <span className="relative px-4 bg-[#14181c] text-[10px] font-black text-white/20 uppercase tracking-widest">Or Secure Entry via</span>
-            </div>
-
-            <GoogleLoginButton 
-              onPress={() => signInWithGoogle()} 
-              isLoading={loading}
-            />
 
             <button 
               onClick={() => signInAsGuest()}
