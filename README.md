@@ -12,6 +12,31 @@ Built as a robust, real-world engineering project, FilmVault demonstrates how to
 
 ---
 
+## 📷 Application Preview
+
+### 1. Home Screen
+![Home Screen](public/screenshots/home.png)
+
+### 2. Search Experience
+![Search Experience](public/screenshots/search.png)
+
+### 3. Movie Details View
+![Movie Details View](public/screenshots/details.png)
+
+### 4. Watchlist Overview
+![Watchlist Overview](public/screenshots/watchlist.png)
+
+### 5. Add to Watchlist Flow
+![Add to Watchlist Flow](public/screenshots/add_watchlist.png)
+
+### 6. Watchlist Items View
+![Watchlist Items View](public/screenshots/watchlist_items.png)
+
+### 7. Profile Dashboard
+![Profile Dashboard](public/screenshots/profile.png)
+
+---
+
 ## 🚀 Key Features
 
 * **Secure Authentication:** User accounts with encrypted password hashing (via `bcryptjs`), JSON Web Token authentication sessions (JWT), and automated token preservation across client page reloads.
