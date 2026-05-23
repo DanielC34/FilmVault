@@ -1,0 +1,6 @@
+# Ignore everything in this directory except the .gitkeep file itself.
+# This ensures that screenshots are not committed to the repo, unless desired.
+# But wait, does the user want the directory to be tracked, or did they want screenshots inside it to be tracked?
+# "Create a folder in the FilmVault project called /public/screenshots and ensure it is tracked in the repo."
+# Let's keep it simple and just have a standard placeholder comment.
+# Placeholder file to track the screenshots directory in git.
